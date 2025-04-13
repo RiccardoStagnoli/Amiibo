@@ -1,1 +1,1 @@
-# Amiibo
+# Amiibo these attached codes contain most of the nfc amiibo codes for nintendo switch and 3ds 
