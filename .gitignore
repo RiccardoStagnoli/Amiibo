@@ -4,3 +4,9 @@ token.json
 client_secret*.json
 __pycache__/
 *.pyc
+
+# Segreteria WhatsApp: librerie, sessione di accesso e messaggi personali.
+node_modules/
+Jarvis/whatsapp/sessione/
+Jarvis/dati/
+Jarvis/whatsapp/package-lock.json

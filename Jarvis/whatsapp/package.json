@@ -1,0 +1,11 @@
+{
+  "name": "jarvis-segreteria-whatsapp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Segreteria WhatsApp di Jarvis",
+  "main": "segreteria_whatsapp.js",
+  "dependencies": {
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.34.7"
+  }
+}

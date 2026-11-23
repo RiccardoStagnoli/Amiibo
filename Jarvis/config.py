@@ -11,3 +11,7 @@ MODELLO_OLLAMA = "gemma2:2b"
 
 # Quanti passaggi del manuale passare all'intelligenza artificiale.
 BRANI_PER_RISPOSTA = 4
+
+# Voce di Jarvis (sintesi vocale di Windows). False = solo testo.
+VOCE_ATTIVA = True
+VELOCITA_VOCE = 175

@@ -4,6 +4,7 @@ Funzioni di questa versione:
 
 1. **Lettura di Gmail** (sola lettura: Jarvis non può inviare, cancellare o modificare email).
 2. **Risposte di meccanica** basate **solo** sul manuale nella cartella `manuali`.
+3. **Segreteria WhatsApp**: risponde a chi ti scrive, registra il messaggio finché la persona invia `1`, e Jarvis te lo rilegge (anche a voce) appena lo apri.
 
 Costo: zero. Si usano la Gmail API di Google (gratuita), Python (gratuito) e, opzionale, Ollama (intelligenza artificiale locale gratuita).
 
@@ -18,6 +19,12 @@ C:\Jarvis\
  ├─ requirements.txt       elenco librerie
  ├─ installa.bat           installa le librerie (una volta sola)
  ├─ avvia_jarvis.bat       avvia Jarvis
+ ├─ installa_whatsapp.bat           installa la segreteria WhatsApp (una volta sola)
+ ├─ avvia_segreteria_whatsapp.bat   avvia la segreteria WhatsApp
+ ├─ whatsapp_reader.py     lettura dei messaggi registrati
+ ├─ voce.py                voce di Jarvis
+ ├─ whatsapp\              programma della segreteria
+ ├─ dati\                  messaggi e vocali registrati (creata da sola)
  ├─ credentials.json       lo scarichi tu da Google (Fase 3)
  └─ manuali\
      └─ la_vettura_automobile_1907.txt
@@ -96,6 +103,7 @@ Jarvis salva l'accesso in `C:\Jarvis\token.json`. Con l'app in modalità "Test",
 | 2 | Ultime email (Posta in arrivo) |
 | 3 | Ricerca in tutta la casella. Usa la stessa sintassi di Gmail: `from:amazon`, `subject:fattura`, `after:2026/11/01`, `has:attachment` |
 | 4 | Domande di meccanica |
+| 5 | Rileggi i messaggi WhatsApp di oggi |
 | 0 | Esci |
 
 Leggere un'email con Jarvis **non** la segna come letta.
@@ -115,6 +123,51 @@ Con Ollama, Jarvis scrive una risposta in italiano **usando solo quei passaggi**
 
 Per usare un altro modello, modifica `MODELLO_OLLAMA` in `C:\Jarvis\config.py` con il Blocco note.
 Requisiti hardware indicativi: almeno 8 GB di RAM. Su PC lenti la risposta può richiedere decine di secondi.
+
+## Fase 7 – Segreteria WhatsApp
+
+> **Rischio da conoscere prima:** la segreteria usa `whatsapp-web.js`, una libreria **non ufficiale** che collega il tuo WhatsApp come se fosse WhatsApp Web. È gratuita, ma **viola i termini di servizio di WhatsApp**: il tuo numero può essere **sospeso o bannato**. Usala a tuo rischio.
+
+Cosa fa:
+
+- Quando qualcuno ti scrive **in privato** (i gruppi vengono ignorati), risponde:
+  *"Riccardo non è al momento raggiungibile, cosa volevi dirgli? Scrivi il tuo messaggio (anche più messaggi o vocali) e poi invia 1 per finire il messaggio."*
+- Registra tutto quello che la persona scrive, vocali compresi, finché invia `1`. Poi risponde *"Grazie, messaggio registrato. Lo riferirò a Riccardo appena possibile."*
+- Se la persona non invia `1`, la registrazione si chiude da sola dopo 15 minuti senza nuovi messaggi.
+- Alla stessa persona l'avviso viene rimandato solo dopo 3 ore. Nel frattempo i suoi messaggi vengono registrati lo stesso.
+- Se qualcuno ti **chiama su WhatsApp**, la chiamata viene rifiutata e la persona riceve un messaggio che la invita a scrivere e a premere `1` per finire.
+- **Funziona solo mentre il PC è acceso e la finestra della segreteria è aperta.**
+
+Installazione:
+
+1. Installa **Node.js** (gratuito): <https://nodejs.org/> → scarica la versione **LTS** per Windows → installa con le opzioni predefinite.
+2. Doppio clic su **`C:\Jarvis\installa_whatsapp.bat`** e attendi `Installazione completata.` (alcuni minuti).
+3. Doppio clic su **`C:\Jarvis\avvia_segreteria_whatsapp.bat`**. Compare un **codice QR**.
+4. Sul telefono: WhatsApp → **Impostazioni** (o i tre puntini) → **Dispositivi collegati** → **Collega un dispositivo** → inquadra il QR.
+5. Quando compare `Segreteria WhatsApp ATTIVA`, lascia aperta la finestra (puoi ridurla a icona). Il QR non servirà più alle aperture successive.
+
+Avvio automatico all'accensione del PC (facoltativo):
+
+1. Premi `Win + R`, scrivi `shell:startup` e premi Invio: si apre la cartella Esecuzione automatica.
+2. Clic destro su `C:\Jarvis\avvia_segreteria_whatsapp.bat` → **Mostra altre opzioni** → **Crea collegamento**.
+3. Sposta il collegamento creato nella cartella Esecuzione automatica.
+
+Cosa succede quando apri Jarvis:
+
+- Jarvis dice *"Bentornato. Hai N nuovi messaggi WhatsApp"*, poi per ogni persona ti legge, a schermo e a voce, cosa ha scritto.
+- Per i messaggi vocali, scrivi il numero e si apre il lettore audio di Windows.
+- I messaggi letti non vengono ripetuti. Con il tasto `5` del menu rileggi quelli di oggi.
+- Le persone che stanno ancora scrivendo vengono mostrate con *[sta ancora scrivendo]* e ripetute alla volta successiva.
+
+Per modificare i testi o i tempi, apri `C:\Jarvis\whatsapp\segreteria_whatsapp.js` con il Blocco note e cambia la sezione `IMPOSTAZIONI` all'inizio del file.
+Per scollegare WhatsApp: sul telefono → **Dispositivi collegati** → tocca il dispositivo → **Disconnetti**.
+
+## Fase 8 – Chiamate normali al cellulare (Vodafone): NON automatizzabili gratis
+
+Non esiste un servizio gratuito che risponda al tuo numero di cellulare, faccia ascoltare un messaggio, registri e si fermi premendo `1`.
+
+- **Segreteria Vodafone:** puoi registrare tu il saluto (*"Riccardo non è al momento raggiungibile..."*) chiamando il **42020**. Però non ho trovato una funzione Vodafone che mandi i messaggi via email, quindi Jarvis **non** può leggerli. Le fonti consultate indicano anche un possibile costo di 1,50 €/giorno quando la segreteria viene usata, salvo offerte che la includono. Verifica al 190.
+- **Alternativa che fa esattamente quello che vuoi (a pagamento):** inoltrare le chiamate senza risposta verso un numero Twilio che legge il messaggio, registra, si ferma con `1` e manda la registrazione a Jarvis. Ha un costo mensile più i minuti e per un numero italiano servono documenti d'identità.
 
 ## Il manuale di meccanica
 
@@ -138,3 +191,6 @@ Requisiti hardware indicativi: almeno 8 GB di RAM. Su PC lenti la risposta può 
 | `Gmail API has not been used in project...` | Gmail API non abilitata (Fase 3, punto 3). |
 | Errori di accesso persistenti | Cancella `C:\Jarvis\token.json` e riavvia Jarvis. |
 | "Ollama non attivo o modello non scaricato" | Fase 6. Verifica con `ollama list` nel Prompt dei comandi. |
+| `Node.js non installato` | Fase 7, punto 1. Dopo l'installazione riavvia il PC. |
+| La segreteria non risponde più | WhatsApp aggiorna spesso il suo sito e la libreria smette di funzionare. Esegui di nuovo `installa_whatsapp.bat` per scaricare l'ultima versione. Se non basta, cancella la cartella `C:\Jarvis\whatsapp\sessione` e ricollega col QR. |
+| Jarvis non parla | La voce usa la sintesi vocale di Windows. Per una voce italiana: Impostazioni → Ora e lingua → Voce → Aggiungi voci → Italiano. Per spegnere la voce: `VOCE_ATTIVA = False` in `config.py`. |
