@@ -22,7 +22,10 @@ C:\Jarvis\
  ├─ config.py                 impostazioni (nome, porta, password, frase di attivazione)
  ├─ server.py                 pannello web
  ├─ ascolto.py                attivazione vocale "Jarvis attivazione"
- ├─ gmail_reader.py, meccanica.py, whatsapp_reader.py, voce.py, jarvis.py
+ ├─ accedi_teams.bat          primo accesso a Teams (Fase 12)
+ ├─ comandi.py, personalita.py, gmail_reader.py, gmail_pulizia.py, teams_reader.py,
+ │  meccanica.py, whatsapp_reader.py, voce.py, jarvis.py
+ ├─ msi\                       agente da copiare sul PC Msi (Fase 13)
  ├─ web\                      grafica del pannello
  ├─ whatsapp\                 servizio WhatsApp
  ├─ manuali\                  manuale di meccanica
@@ -55,13 +58,16 @@ C:\Jarvis\
 
 Per vedere le estensioni dei file (serve nella Fase 3): in Esplora file → **Visualizza** → **Mostra** → spunta **Estensioni nomi file**.
 
-## Fase 3 – Autorizzare Jarvis a leggere Gmail (Google Cloud, gratuito)
+## Fase 3 – Collegare l'account Google (Google Cloud, gratuito)
 
-Non serve carta di credito: la Gmail API non richiede un account di fatturazione.
+Jarvis chiede **accesso completo** a Gmail (leggere, archiviare, spam, cestino, eliminazione definitiva), Google Calendar e Google Drive. Non serve carta di credito.
 
 1. Apri <https://console.cloud.google.com/> e accedi con **lo stesso account Gmail** che Jarvis deve leggere. Accetta i termini se richiesto.
 2. **Crea il progetto**: in alto clicca il selettore dei progetti → **Nuovo progetto** → Nome: `Jarvis` → **Crea**. Assicurati che in alto sia selezionato il progetto `Jarvis`.
-3. **Abilita la Gmail API**: apri <https://console.cloud.google.com/apis/library/gmail.googleapis.com> → **Abilita**.
+3. **Abilita le tre API** (apri ogni link e premi **Abilita**):
+   - Gmail: <https://console.cloud.google.com/apis/library/gmail.googleapis.com>
+   - Calendar: <https://console.cloud.google.com/apis/library/calendar-json.googleapis.com>
+   - Drive: <https://console.cloud.google.com/apis/library/drive.googleapis.com>
 4. **Configura la schermata di consenso**: apri <https://console.cloud.google.com/auth/overview> → **Inizia** (Get started):
    - Nome app: `Jarvis` – Email di assistenza: la tua → Avanti
    - Pubblico (Audience): **Esterno** (External) → Avanti
@@ -90,11 +96,11 @@ Se Windows mostra "Windows ha protetto il PC": **Ulteriori informazioni** → **
 3. Si apre il browser:
    - scegli il tuo account Gmail;
    - compare "**Google non ha verificato questa app**": è normale, l'app è tua. Clicca **Continua** (oppure **Avanzate** → **Vai a Jarvis**);
-   - consenti la lettura della posta → **Continua**;
+   - spunta **tutti** i permessi richiesti (Gmail, Calendar, Drive) → **Continua**;
    - compare `The authentication flow has completed`: chiudi la scheda e torna alla finestra di Jarvis.
 4. Jarvis mostra le email. Scrivi il numero di un'email per leggerla, Invio vuoto per tornare al menu.
 
-Jarvis salva l'accesso in `C:\Jarvis\token.json`. Con l'app in modalità "Test", Google fa scadere l'accesso dopo **7 giorni**: Jarvis riapre il browser da solo e ripeti il punto 3.
+Jarvis salva l'accesso in `C:\Jarvis\token.json`. **Se avevi già fatto l'accesso con la versione precedente**, Jarvis lo chiede di nuovo da solo perché i permessi sono cambiati. Con l'app in modalità "Test", Google fa scadere l'accesso dopo **7 giorni**: Jarvis riapre il browser da solo e ripeti il punto 3.
 
 ### Menu
 
@@ -206,6 +212,103 @@ Non esiste un servizio gratuito che risponda al tuo numero di cellulare, faccia 
 
 - **Segreteria Vodafone:** puoi registrare tu il saluto (*"Riccardo non è al momento raggiungibile..."*) chiamando il **42020**. Però non ho trovato una funzione Vodafone che mandi i messaggi via email, quindi Jarvis **non** può leggerli. Le fonti consultate indicano anche un possibile costo di 1,50 €/giorno quando la segreteria viene usata, salvo offerte che la includono. Verifica al 190.
 - **Alternativa che fa esattamente quello che vuoi (a pagamento):** inoltrare le chiamate senza risposta verso un numero Twilio che legge il messaggio, registra, si ferma con `1` e manda la registrazione a Jarvis. Ha un costo mensile più i minuti e per un numero italiano servono documenti d'identità.
+
+## Fase 11 – Google: pulizia spam e spazio
+
+Sezione **Google** del pannello:
+- **Spazio account**: quanto occupano Gmail, Drive e Foto.
+- **Analizza posta in arrivo**: Jarvis assegna a ogni email un punteggio da 0 a 100%.
+  - **≥ 90%**: preselezionata (bordo rosso): pubblicità o spam quasi certi.
+  - **60–89%**: mostrata ma **non** selezionata (dubbia).
+  - sotto 60%: ignorata.
+  - Non tocca **mai**: email con stella o importanti, mittenti a cui hai scritto almeno una volta, mittenti in `MITTENTI_PROTETTI` (`config.py`, es. `["scuola.it", "banca.it"]`).
+  - Il punteggio è calcolato con regole (categoria Promozioni di Gmail, link di disiscrizione, mittenti noreply/newsletter, parole tipo "sconto", "-50%"). **Non è una probabilità misurata**: controlla la lista prima di confermare.
+- Pulsanti: **Archivia** (toglie dalla posta in arrivo), **Segna come spam**, **Sposta nel cestino**.
+- **Email pesanti**: email oltre 5 MB e più vecchie di un anno (di solito allegati), per liberare spazio.
+- **Svuota cestino Gmail**: elimina **definitivamente** tutto il cestino. Irreversibile; Jarvis chiede conferma. Senza svuotarlo, Gmail lo svuota da solo dopo 30 giorni.
+
+Comandi utili nella barra: `pulisci la posta`, `spazio account`, `agenda`, `aggiungi al calendario: dentista domani alle 15` (data e ora le interpreta Google: verifica sempre l'evento creato), `cerca su drive verifica di storia`.
+
+## Fase 12 – Teams (messaggi dei professori)
+
+Jarvis usa Microsoft Graph (gratuito) con il **tuo** account della scuola. Limiti reali, da sapere prima:
+- Molte scuole **impediscono** agli studenti di autorizzare app esterne. Se al punto 5 compare "Approvazione dell'amministratore necessaria", Teams via Jarvis non è possibile senza il permesso della scuola: usa l'alternativa in fondo.
+- Jarvis legge sicuramente solo le **chat** (private e di gruppo). I **post nei canali** dei corsi richiedono un permesso che solo l'amministratore della scuola può concedere (`TEAMS_LEGGI_CANALI`, lasciato a `False`).
+
+1. Vai su <https://entra.microsoft.com> (o <https://portal.azure.com>) e accedi con un account Microsoft **personale** (es. Outlook/Hotmail). Se ti chiede di creare una directory o un abbonamento gratuito, segui la procedura. *Dati insufficienti per verificare se per tutti gli account è richiesta una carta: alcuni utenti la vedono chiesta per l'abbonamento Azure gratuito.*
+2. **Registrazioni app** (App registrations) → **Nuova registrazione**:
+   - Nome: `Jarvis`
+   - Tipi di account supportati: **Account in qualsiasi directory organizzativa e account Microsoft personali** (multi-tenant)
+   - URI di reindirizzamento: lascia vuoto → **Registra**.
+3. Copia l'**ID applicazione (client)** e incollalo in `config.py` → `TEAMS_CLIENT_ID = "..."`.
+4. Menu **Autenticazione** → in fondo **Consenti flussi client pubblici** → **Sì** → **Salva**.
+5. In `config.py`, in `TEAMS_PROFESSORI` scrivi i cognomi dei prof, es. `["Rossi", "Bianchi"]` (lista vuota = tutti i messaggi).
+6. Doppio clic su **`C:\Jarvis\accedi_teams.bat`**: compare un codice. Apri <https://microsoft.com/devicelogin>, inserisci il codice, accedi con l'**account della scuola** e accetta.
+7. Riavvia `avvia_server_jarvis.bat`. Da ora i nuovi messaggi dei prof vengono letti nel **rapporto** all'attivazione e nella sezione **Teams**.
+
+**Alternativa se la scuola blocca l'accesso:** in Teams → Impostazioni → Notifiche, attiva le **notifiche via email** per i messaggi persi. Se l'email della scuola è inoltrabile, inoltra quelle notifiche al tuo Gmail: Jarvis le leggerà come email (comando `leggi la posta`).
+
+## Fase 13 – Controllo del PC "Msi"
+
+Sul PC Msi gira un piccolo **agente** che si collega al server e riceve i comandi. Sul PC Msi non serve aprire porte.
+
+**Sul PC server:**
+1. Inventa un token lungo e casuale (almeno 30 caratteri, lettere e numeri) e scrivilo in `config.py` → `TOKEN_AGENTE_MSI = "..."`.
+2. Imposta `HOST_PANNELLO = "0.0.0.0"` e una `PASSWORD_PANNELLO` di almeno 12 caratteri (il PC Msi deve raggiungere il server in rete).
+3. Prendi nota dell'indirizzo IP del server: Prompt dei comandi → `ipconfig` → *Indirizzo IPv4* (es. `192.168.1.20`).
+   Consiglio: nel router assegna al server un **IP fisso** (DHCP statico), altrimenti l'indirizzo può cambiare.
+4. Riavvia `avvia_server_jarvis.bat`.
+
+**Sul PC Msi:**
+1. Installa Python (Fase 1) anche sul Msi.
+2. Copia la cartella `C:\Jarvis\msi` del server sul Msi, ad esempio in `C:\JarvisMsi`.
+3. Apri `C:\JarvisMsi\msi_agente.py` con il Blocco note e modifica:
+   - `SERVER = "http://192.168.1.20:8080"` (l'IP del server)
+   - `TOKEN = "..."` (lo stesso token del server)
+   - `COMANDI_LIBERI = False` (lascia così: con `True` Jarvis può eseguire qualsiasi comando del Prompt sul Msi; pericoloso se qualcuno entra nel pannello).
+4. Doppio clic su `installa_msi.bat`, poi su `avvia_msi.bat`. Se Windows chiede l'accesso alla rete, consenti le reti private.
+5. Avvio automatico: `Win + R` → `shell:startup` → crea un collegamento ad `avvia_msi.bat`.
+
+Nel pannello, il widget **Msi** diventa **ONLINE**. Comandi (barra in alto, oppure a voce):
+
+| Esempio | Cosa fa sul Msi |
+|---|---|
+| `apri chrome e cerca youtube` | Chrome con la ricerca Google "youtube" |
+| `cerca su youtube musica lofi` | Ricerca su YouTube |
+| `apri youtube.com` | Apre il sito |
+| `apri steam e scarica Portal 2` | Cerca il gioco su Steam e apre la finestra di installazione (va confermata in Steam; i giochi non posseduti vanno prima comprati) |
+| `apri discord` / `apri spotify` / `apri <qualsiasi programma del menu Start>` | Apre il programma |
+| `screenshot msi` | Mostra nel pannello lo schermo del Msi |
+| `blocca msi` / `spegni msi` / `riavvia msi` / `annulla spegnimento` | Spegnimento e riavvio con 60 secondi di preavviso |
+
+Regola del 90%: se il nome del programma o del gioco non corrisponde almeno al 90%, Jarvis **non** apre nulla e propone i nomi simili.
+
+## Fase 14 – Usare Jarvis da qualsiasi dispositivo (anche fuori casa) e Rabbit R1
+
+**In casa (stessa rete Wi-Fi):** Fase 9, punto 4 (`HOST_PANNELLO = "0.0.0.0"` + password), poi apri `http://IP-DEL-SERVER:8080` dal telefono.
+
+**Fuori casa – Tailscale (gratuito per uso personale):** crea una rete privata tra i tuoi dispositivi, senza aprire porte sul router.
+1. Crea un account su <https://tailscale.com> e installa Tailscale sul **server**, sul **telefono** e (se vuoi) sul **Msi**, accedendo sempre con lo stesso account.
+2. In `config.py` del server: `ACCESSO_REMOTO = True` e `PASSWORD_PANNELLO` di almeno 12 caratteri.
+3. Nell'app Tailscale del server leggi l'indirizzo `100.x.y.z`. Dal telefono, con Tailscale attivo, apri `http://100.x.y.z:8080`.
+4. Sul telefono: menu del browser → **Aggiungi a schermata Home**: Jarvis si apre come un'app.
+
+**Rabbit R1:** sul R1 non si può installare Tailscale, quindi serve un indirizzo pubblico HTTPS:
+1. Sul server, nel Prompt dei comandi: `tailscale funnel --bg 8080`. La prima volta Tailscale può mostrare un link per abilitare HTTPS/Funnel nel pannello di amministrazione: aprilo e conferma, poi ripeti il comando. Tailscale mostra un indirizzo tipo `https://nome-pc.tuo-nome.ts.net`. Con `ACCESSO_REMOTO = True` e la password, chi apre quell'indirizzo deve fare l'accesso. Dopo 5 password sbagliate l'IP viene bloccato per 10 minuti.
+2. Indirizzo da usare sul R1: `https://nome-pc.tuo-nome.ts.net/?modo=r1` (layout compatto: nucleo, stato, microfono).
+3. Come aprire una pagina web sul R1: *dati insufficienti per verificare la procedura attuale.* Il R1 supporta le "creations" (app web caricate tramite codice QR dal portale rabbithole); se il tuo R1 lo permette, crea una creation con l'indirizzo del punto 2. Il layout compatto è stato provato a 240×282 e 360×480 pixel.
+4. Per spegnere l'accesso pubblico: `tailscale funnel reset`.
+
+## Fase 15 – Personalità e regole di Jarvis
+
+- **Serio e diretto**: niente saluti di cortesia né complimenti.
+- **Regola del 90%** (`SOGLIA_CERTEZZA` in `config.py`):
+  - meccanica: risponde solo se il manuale contiene almeno il 90% dei termini della domanda, altrimenti dice *"Dati insufficienti per verificare"*;
+  - WhatsApp, programmi, giochi: agisce solo se il nome corrisponde almeno al 90%;
+  - pulizia Gmail: preseleziona solo punteggi ≥ 90%.
+- **Insulti** (`INSULTI_ATTIVI`): solo quando sbagli tu (comando vuoto o incompleto, chat inesistente, password errata, messaggio vuoto, nessuna opzione selezionata). Mai per errori di Jarvis (servizio spento, rete, ecc.). Per disattivarli: `INSULTI_ATTIVI = False`.
+- **Comandi a voce dal PC server**: dopo "Jarvis attivazione" hai 7 secondi per dire il comando. Il modello vocale leggero sbaglia spesso le parole straniere (Chrome, YouTube, Steam). Se capita, in `config.py` imposta `MODELLO_VOSK = "vosk-model-it-0.22"` (più preciso, 1,3 GB da scaricare, usa molta più RAM). Il pulsante **Mic** del pannello usa invece il riconoscimento vocale del browser (online), che di solito è più preciso.
+- **Aspetto** (Impostazioni → Aspetto): 4 temi colore, effetti sonori, particelle animate, sequenza di avvio. Pulsante ⛶ in alto per lo schermo intero.
 
 ## Il manuale di meccanica
 

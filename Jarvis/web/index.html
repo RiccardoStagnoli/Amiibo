@@ -1,29 +1,52 @@
 <!doctype html>
-<html lang="it">
+<html lang="it" data-tema="ciano">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#03080f">
 <title>J.A.R.V.I.S.</title>
+<link rel="manifest" href="/web/manifest.json">
+<link rel="icon" href="/web/icona.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="/web/style.css">
 </head>
 <body>
+<canvas id="particelle" aria-hidden="true"></canvas>
 <div class="griglia-sfondo" aria-hidden="true"></div>
+<div class="scansione" aria-hidden="true"></div>
+
+<!-- Sequenza di avvio -->
+<div id="avvio" class="avvio" hidden>
+  <div class="avvio-logo">J.A.R.V.I.S.</div>
+  <pre id="avvio-righe" class="avvio-righe"></pre>
+  <div class="avvio-barra"><div id="avvio-progresso"></div></div>
+</div>
 
 <header class="barra">
   <div class="logo">J.A.R.V.I.S.</div>
   <div class="stati">
-    <span class="pillola" id="stato-wa">WhatsApp ...</span>
-    <span class="pillola" id="stato-voce">Voce ...</span>
+    <span class="pillola" id="stato-wa">WhatsApp</span>
+    <span class="pillola" id="stato-msi">Msi</span>
+    <span class="pillola" id="stato-voce">Voce</span>
     <span class="orologio" id="orologio">--:--</span>
+    <button class="icona-btn" id="btn-schermo" title="Schermo intero" aria-label="Schermo intero">⛶</button>
   </div>
 </header>
+
+<form id="form-comando" class="comando">
+  <span class="prompt" aria-hidden="true">&gt;</span>
+  <input id="testo-comando" class="campo" placeholder="Comanda Jarvis... (es. apri chrome e cerca youtube)" autocomplete="off">
+  <button type="button" class="btn sec" id="btn-mic-comando" title="Parla">Mic</button>
+  <button class="btn" type="submit">Esegui</button>
+</form>
 
 <nav class="menu" id="menu">
   <button data-sezione="centrale" class="attivo">Centrale</button>
   <button data-sezione="whatsapp">WhatsApp</button>
-  <button data-sezione="gmail">Gmail</button>
+  <button data-sezione="gmail">Google</button>
+  <button data-sezione="teams">Teams</button>
+  <button data-sezione="msi">Msi</button>
   <button data-sezione="meccanica">Meccanica</button>
   <button data-sezione="impostazioni">Impostazioni</button>
 </nav>
@@ -32,23 +55,29 @@
   <!-- CENTRALE -->
   <section id="centrale" class="sezione visibile">
     <div class="nucleo-zona">
-      <svg class="nucleo" id="nucleo" viewBox="0 0 200 200" aria-hidden="true">
-        <circle class="anello a1" cx="100" cy="100" r="92"/>
-        <circle class="anello a2" cx="100" cy="100" r="78"/>
-        <circle class="anello a3" cx="100" cy="100" r="64"/>
-        <circle class="anello a4" cx="100" cy="100" r="50"/>
-        <circle class="cuore" cx="100" cy="100" r="30"/>
-        <text x="100" y="105" text-anchor="middle" class="nucleo-testo">JARVIS</text>
-      </svg>
+      <div class="nucleo-contenitore">
+        <div class="onde" id="onde" aria-hidden="true"></div>
+        <svg class="nucleo" id="nucleo" viewBox="0 0 200 200" aria-hidden="true">
+          <circle class="anello a1" cx="100" cy="100" r="92"/>
+          <circle class="anello a2" cx="100" cy="100" r="78"/>
+          <circle class="anello a3" cx="100" cy="100" r="64"/>
+          <circle class="anello a4" cx="100" cy="100" r="50"/>
+          <circle class="cuore" cx="100" cy="100" r="30"/>
+          <text x="100" y="105" text-anchor="middle" class="nucleo-testo">JARVIS</text>
+        </svg>
+      </div>
       <p class="parlato" id="parlato">In attesa.</p>
       <div class="azioni">
-        <button class="btn" id="btn-rapporto">Rapporto completo</button>
+        <button class="btn" id="btn-rapporto">Rapporto</button>
         <button class="btn sec" id="btn-zitto">Silenzio</button>
       </div>
     </div>
-    <div class="pannello">
-      <h2>Segreteria WhatsApp</h2>
-      <div id="lista-segreteria" class="lista"></div>
+    <div class="widget-griglia">
+      <div class="pannello widget"><h2>Meteo</h2><div id="w-meteo" class="w-corpo">...</div></div>
+      <div class="pannello widget"><h2>Server</h2><div id="w-server" class="w-corpo">...</div></div>
+      <div class="pannello widget"><h2>Msi</h2><div id="w-msi" class="w-corpo">...</div></div>
+      <div class="pannello widget"><h2>Agenda</h2><div id="w-agenda" class="w-corpo">...</div></div>
+      <div class="pannello widget largo"><h2>Segreteria WhatsApp</h2><div id="lista-segreteria" class="lista"></div></div>
     </div>
   </section>
 
@@ -79,8 +108,12 @@
     </div>
   </section>
 
-  <!-- GMAIL -->
+  <!-- GOOGLE -->
   <section id="gmail" class="sezione">
+    <div class="pannello">
+      <h2>Spazio account Google</h2>
+      <div id="spazio" class="nota">...</div>
+    </div>
     <div class="pannello">
       <h2>Gmail</h2>
       <div class="azioni">
@@ -91,6 +124,50 @@
       </div>
       <div id="lista-gmail" class="lista"></div>
       <article id="email-aperta" class="email" hidden></article>
+    </div>
+    <div class="pannello">
+      <h2>Pulizia spam e pubblicità</h2>
+      <p class="nota">Jarvis preseleziona solo le email con punteggio ≥ 90%. Le dubbie restano non selezionate. Il punteggio è una stima a regole, non una probabilità misurata.</p>
+      <div class="azioni">
+        <button class="btn" id="btn-analizza">Analizza posta in arrivo</button>
+        <button class="btn sec" id="btn-pesanti">Email pesanti (&gt;5 MB, &gt;1 anno)</button>
+      </div>
+      <div id="lista-pulizia" class="lista"></div>
+      <div class="azioni" id="azioni-pulizia" hidden>
+        <button class="btn sec" data-azione="archivia">Archivia selezionate</button>
+        <button class="btn sec" data-azione="spam">Segna come spam</button>
+        <button class="btn pericolo" data-azione="cestina">Sposta nel cestino</button>
+      </div>
+      <div class="azioni"><button class="btn piccolo pericolo" id="btn-svuota">Svuota cestino Gmail (definitivo)</button></div>
+    </div>
+  </section>
+
+  <!-- TEAMS -->
+  <section id="teams" class="sezione">
+    <div class="pannello">
+      <h2>Teams – messaggi dei professori</h2>
+      <div class="azioni"><button class="btn" id="btn-teams">Controlla ora</button><button class="btn sec" id="btn-teams-letti">Segna come letti</button></div>
+      <div id="lista-teams" class="lista"></div>
+    </div>
+  </section>
+
+  <!-- MSI -->
+  <section id="msi" class="sezione">
+    <div class="pannello">
+      <h2>PC Msi</h2>
+      <div id="msi-stato" class="nota">...</div>
+      <div class="griglia-tasti">
+        <button class="btn" data-msi="apri chrome">Chrome</button>
+        <button class="btn" data-msi="apri steam">Steam</button>
+        <button class="btn" data-msi="apri discord">Discord</button>
+        <button class="btn" data-msi="apri spotify">Spotify</button>
+        <button class="btn" data-msi="apri esplora file">File</button>
+        <button class="btn" data-msi="screenshot msi">Screenshot</button>
+        <button class="btn sec" data-msi="blocca msi">Blocca</button>
+        <button class="btn pericolo" data-msi="spegni msi" data-conferma="Spegnere il PC Msi?">Spegni</button>
+      </div>
+      <p class="nota">Oppure scrivi nella barra in alto: "apri chrome e cerca ...", "apri steam e scarica ...", "apri &lt;programma&gt;".</p>
+      <img id="msi-schermo" class="schermo" alt="Screenshot del PC Msi" hidden>
     </div>
   </section>
 
@@ -110,8 +187,16 @@
   <!-- IMPOSTAZIONI -->
   <section id="impostazioni" class="sezione">
     <div class="pannello">
-      <h2>Collegamento WhatsApp</h2>
-      <div id="qr-zona" class="nota">Controllo...</div>
+      <h2>Aspetto</h2>
+      <div class="temi" id="temi">
+        <button class="tema" data-tema="ciano" title="Ciano">Ciano</button>
+        <button class="tema" data-tema="mark" title="Rosso e oro">Rosso/Oro</button>
+        <button class="tema" data-tema="verde" title="Verde">Verde</button>
+        <button class="tema" data-tema="viola" title="Viola">Viola</button>
+      </div>
+      <label class="interruttore"><input type="checkbox" id="chk-suoni"><span>Effetti sonori</span></label>
+      <label class="interruttore"><input type="checkbox" id="chk-particelle"><span>Particelle animate</span></label>
+      <label class="interruttore"><input type="checkbox" id="chk-avvio"><span>Sequenza di avvio all'attivazione</span></label>
     </div>
     <div class="pannello">
       <h2>Voce</h2>
@@ -122,6 +207,10 @@
       <label class="interruttore"><input type="checkbox" id="chk-voce"><span>Voce attiva</span></label>
       <div class="azioni"><button class="btn" id="btn-prova-voce">Prova voce</button></div>
       <p class="nota">Per l'effetto "vecchio maestro" scegli una voce italiana non "Natural" (es. Microsoft Elsa o Cosimo): le voci "Natural" ignorano il tono.</p>
+    </div>
+    <div class="pannello">
+      <h2>Collegamento WhatsApp</h2>
+      <div id="qr-zona" class="nota">Controllo...</div>
     </div>
     <div class="pannello">
       <h2>Segreteria automatica</h2>
@@ -136,6 +225,7 @@
   </section>
 </main>
 
+<div id="notifiche" class="notifiche" aria-live="polite"></div>
 <div class="sblocca" id="sblocca" hidden>Tocca lo schermo per attivare la voce di Jarvis</div>
 
 <dialog id="dlg-inoltra" class="dialogo">

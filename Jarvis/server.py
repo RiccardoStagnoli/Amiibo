@@ -1,14 +1,19 @@
 """
-JARVIS - Server del pannello web.
+JARVIS - Server centrale.
 
-Avvia il pannello futuristico su http://localhost:8080 (porta in config.py).
-Collega: Gmail, manuale di meccanica, servizio WhatsApp (whatsapp/servizio_whatsapp.js).
+Pannello web su http://localhost:8080 (porta in config.py), raggiungibile da
+qualsiasi dispositivo autorizzato (telefono, Rabbit R1, altri PC) se configurato.
+Collega: WhatsApp, Google (Gmail/Calendario/Drive), Teams, PC Msi, meccanica.
 """
 
+import json
 import os
 import secrets
 import sys
+import threading
+import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from functools import wraps
 
@@ -16,37 +21,60 @@ from flask import Flask, abort, jsonify, redirect, request, send_from_directory,
 
 import config
 import whatsapp_reader
+from comandi import Interprete
 from meccanica import EspertoMeccanica
+from personalita import errore_utente
 
 CARTELLA = os.path.dirname(os.path.abspath(__file__))
 CARTELLA_WEB = os.path.join(CARTELLA, "web")
 CARTELLA_DATI = os.path.join(CARTELLA, "dati")
 API_WHATSAPP = "http://127.0.0.1:3010"
+FILE_WEB = ("style.css", "app.js", "manifest.json", "icona.svg")
 
 os.makedirs(CARTELLA_DATI, exist_ok=True)
 
 
-def _chiave_segreta():
-    file_chiave = os.path.join(CARTELLA_DATI, ".chiave_sessione")
-    if not os.path.exists(file_chiave):
-        with open(file_chiave, "w", encoding="utf-8") as f:
+def _segreto(nome):
+    percorso = os.path.join(CARTELLA_DATI, nome)
+    if not os.path.exists(percorso):
+        with open(percorso, "w", encoding="utf-8") as f:
             f.write(secrets.token_hex(32))
-    with open(file_chiave, encoding="utf-8") as f:
+    with open(percorso, encoding="utf-8") as f:
         return f.read().strip()
 
 
 app = Flask(__name__, static_folder=None)
-app.secret_key = _chiave_segreta()
-app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Strict")
+app.secret_key = _segreto(".chiave_sessione")
+app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
+                  PERMANENT_SESSION_LIFETIME=60 * 60 * 24 * 30)
+TOKEN_INTERNO = _segreto(".token_interno")  # usato da ascolto.py sullo stesso PC
 
 esperto = EspertoMeccanica()
 
 
-# ------------------------------- ACCESSO -------------------------------
+# =============================== ACCESSO ===============================
+_tentativi = {}  # ip -> [timestamp falliti]
+
+
+def _bloccato(ip):
+    recenti = [t for t in _tentativi.get(ip, []) if time.time() - t < 600]
+    _tentativi[ip] = recenti
+    return len(recenti) >= 5
+
+
+def _interno():
+    return (request.remote_addr in ("127.0.0.1", "::1")
+            and secrets.compare_digest(request.headers.get("X-Token-Interno", ""), TOKEN_INTERNO))
+
+
 def richiede_accesso(funzione):
     @wraps(funzione)
     def controllata(*args, **kwargs):
-        if config.PASSWORD_PANNELLO and not session.get("autorizzato"):
+        inoltrata = request.headers.get("X-Forwarded-For") or request.headers.get("Forwarded")
+        if not config.PASSWORD_PANNELLO and (inoltrata or getattr(config, "ACCESSO_REMOTO", False)):
+            # Richiesta arrivata da internet (es. Tailscale Funnel) senza password impostata: blocca.
+            return jsonify(errore="Accesso remoto bloccato: imposta PASSWORD_PANNELLO in config.py."), 403
+        if config.PASSWORD_PANNELLO and not session.get("autorizzato") and not _interno():
             if request.path.startswith("/api/"):
                 return jsonify(errore="Accesso richiesto"), 401
             return redirect("/accesso")
@@ -57,28 +85,38 @@ def richiede_accesso(funzione):
 
 @app.route("/accesso", methods=["GET", "POST"])
 def accesso():
-    errore = ""
+    messaggio = ""
+    ip = request.remote_addr
     if request.method == "POST":
-        if config.PASSWORD_PANNELLO and secrets.compare_digest(
-            request.form.get("password", ""), config.PASSWORD_PANNELLO
-        ):
+        if _bloccato(ip):
+            messaggio = "Troppi tentativi sbagliati. Riprova tra 10 minuti."
+        elif config.PASSWORD_PANNELLO and secrets.compare_digest(
+                request.form.get("password", ""), config.PASSWORD_PANNELLO):
+            session.permanent = True
             session["autorizzato"] = True
             return redirect("/")
-        errore = '<p class="errore">Password errata</p>'
+        else:
+            _tentativi.setdefault(ip, []).append(time.time())
+            messaggio = errore_utente("Password errata.")
     with open(os.path.join(CARTELLA_WEB, "accesso.html"), encoding="utf-8") as f:
-        return f.read().replace("<!--ERRORE-->", errore), (401 if errore else 200)
+        pagina = f.read()
+    if messaggio:
+        from html import escape
+
+        pagina = pagina.replace("<!--ERRORE-->", f'<p class="errore">{escape(messaggio)}</p>')
+    return pagina, (401 if messaggio else 200)
 
 
-# -------------------------------- PAGINE --------------------------------
+# ================================ PAGINE ================================
 @app.route("/")
 @richiede_accesso
 def pagina():
     return send_from_directory(CARTELLA_WEB, "index.html")
 
 
-@app.route("/web/<path:nome>")
+@app.route("/web/<nome>")
 def risorse(nome):
-    if nome not in ("style.css", "app.js"):
+    if nome not in FILE_WEB:
         abort(404)
     return send_from_directory(CARTELLA_WEB, nome)
 
@@ -89,18 +127,130 @@ def vocale(nome):
     return send_from_directory(whatsapp_reader.CARTELLA_VOCALI, os.path.basename(nome))
 
 
-# ------------------------------ API: GENERALE ------------------------------
-@app.route("/api/profilo")
+# =============================== ANNUNCI ===============================
+# Frasi che il pannello deve dire ad alta voce (es. esiti di comandi vocali).
+_annunci, _blocco_annunci = [], threading.Lock()
+
+
+def annuncia(testo, **extra):
+    with _blocco_annunci:
+        _annunci.append({"id": len(_annunci) + 1, "testo": testo, "ora": time.time(), **extra})
+        del _annunci[:-100]
+
+
+@app.route("/api/annunci")
 @richiede_accesso
-def profilo():
-    return jsonify(
-        nome=config.NOME_UTENTE,
-        stile_saggio=config.STILE_SAGGIO,
-        manuali=esperto.manuali_caricati(),
-    )
+def annunci():
+    dopo = int(request.args.get("dopo", 0))
+    with _blocco_annunci:
+        ultimo = _annunci[-1]["id"] if _annunci else 0
+        return jsonify(ultimo=ultimo, annunci=[a for a in _annunci if a["id"] > dopo])
 
 
-# ---------------------------- API: SEGRETERIA ----------------------------
+# ============================== AGENTE MSI ==============================
+class AgenteMsi:
+    def __init__(self):
+        self.coda = []
+        self.esiti = {}
+        self.cond = threading.Condition()
+        self.ultimo_contatto = 0
+        self.stato = {}
+
+    def online(self):
+        return time.time() - self.ultimo_contatto < 60
+
+    def invia(self, azione, parametri, attesa=25):
+        if not getattr(config, "TOKEN_AGENTE_MSI", ""):
+            return {"testo": "PC Msi non configurato (TOKEN_AGENTE_MSI in config.py).", "esito": "errore"}
+        if not self.online():
+            return {"testo": "Msi spento, fuori rete o agente non avviato.", "esito": "errore"}
+        cid = secrets.token_hex(6)
+        with self.cond:
+            self.coda.append({"id": cid, "azione": azione, "parametri": parametri})
+            self.cond.notify_all()
+            fine = time.time() + attesa
+            while cid not in self.esiti and time.time() < fine:
+                self.cond.wait(timeout=fine - time.time())
+            esito = self.esiti.pop(cid, None)
+        if esito is None:
+            return {"testo": "Comando inviato a Msi, nessuna conferma entro 25 secondi.", "esito": "incerto"}
+        return {"esito": "ok", **esito}
+
+    def attendi_comando(self, stato):
+        with self.cond:
+            self.ultimo_contatto = time.time()
+            self.stato = stato or {}
+            fine = time.time() + 25
+            while not self.coda and time.time() < fine:
+                self.cond.wait(timeout=fine - time.time())
+                self.ultimo_contatto = time.time()
+            return self.coda.pop(0) if self.coda else None
+
+    def registra_esito(self, dati):
+        with self.cond:
+            self.esiti[dati.get("id")] = {k: v for k, v in dati.items() if k != "id"}
+            self.cond.notify_all()
+
+
+msi = AgenteMsi()
+
+
+def _token_agente_valido():
+    atteso = getattr(config, "TOKEN_AGENTE_MSI", "")
+    return bool(atteso) and secrets.compare_digest(request.headers.get("X-Token-Agente", ""), atteso)
+
+
+@app.route("/api/agente/attesa", methods=["POST"])
+def agente_attesa():
+    if not _token_agente_valido():
+        abort(403)
+    return jsonify(comando=msi.attendi_comando(request.get_json(silent=True)))
+
+
+@app.route("/api/agente/esito", methods=["POST"])
+def agente_esito():
+    if not _token_agente_valido():
+        abort(403)
+    msi.registra_esito(request.get_json(silent=True) or {})
+    return jsonify(ok=True)
+
+
+# =============================== WHATSAPP ===============================
+def wa(percorso, dati=None):
+    corpo = json.dumps(dati).encode("utf-8") if dati is not None else None
+    req = urllib.request.Request(f"{API_WHATSAPP}/{percorso}", data=corpo,
+                                 method="POST" if dati is not None else "GET",
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(json.loads(e.read().decode("utf-8") or "{}").get("errore", f"WhatsApp: errore {e.code}"))
+    except (urllib.error.URLError, OSError):
+        raise RuntimeError("Servizio WhatsApp spento.")
+
+
+@app.route("/api/wa/<percorso>", methods=["GET", "POST"])
+@richiede_accesso
+def whatsapp(percorso):
+    if percorso not in ("stato", "impostazioni", "chat", "messaggi", "invia", "inoltra", "vota", "letta"):
+        abort(404)
+    url = f"{API_WHATSAPP}/{percorso}"
+    if request.query_string:
+        url += "?" + request.query_string.decode()
+    dati = request.get_data() if request.method == "POST" else None
+    req = urllib.request.Request(url, data=dati, method=request.method,
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            return app.response_class(r.read(), status=r.status, mimetype="application/json")
+    except urllib.error.HTTPError as e:
+        return app.response_class(e.read(), status=e.code, mimetype="application/json")
+    except (urllib.error.URLError, OSError):
+        return jsonify(errore="Servizio WhatsApp spento. Avvialo con avvia_server_jarvis.bat"), 503
+
+
+# ============================== SEGRETERIA ==============================
 @app.route("/api/segreteria")
 @richiede_accesso
 def segreteria():
@@ -116,18 +266,9 @@ def segreteria():
                 contenuti.append({"vocale": "/vocali/" + v["vocale"]})
             else:
                 contenuti.append({"testo": str(v)})
-        risultato.append(
-            {
-                "id": r.get("id"),
-                "contatto": r.get("contatto"),
-                "inizio": r.get("inizio"),
-                "stato": r.get("stato"),
-                "chiuso_con": r.get("chiuso_con"),
-                "origine": r.get("origine"),
-                "contenuti": contenuti,
-                "nuovo": r.get("id") in id_nuovi,
-            }
-        )
+        risultato.append({"id": r.get("id"), "contatto": r.get("contatto"), "inizio": r.get("inizio"),
+                          "stato": r.get("stato"), "chiuso_con": r.get("chiuso_con"),
+                          "origine": r.get("origine"), "contenuti": contenuti, "nuovo": r.get("id") in id_nuovi})
     return jsonify(risultato)
 
 
@@ -139,80 +280,220 @@ def segreteria_letti():
     return jsonify(ok=True)
 
 
-# ------------------------------ API: WHATSAPP ------------------------------
-@app.route("/api/wa/<percorso>", methods=["GET", "POST"])
-@richiede_accesso
-def whatsapp(percorso):
-    if percorso not in ("stato", "impostazioni", "chat", "messaggi", "invia", "inoltra", "vota", "letta"):
-        abort(404)
-    url = f"{API_WHATSAPP}/{percorso}"
-    if request.query_string:
-        url += "?" + request.query_string.decode()
-    dati = request.get_data() if request.method == "POST" else None
-    req = urllib.request.Request(
-        url, data=dati, method=request.method, headers={"Content-Type": "application/json"}
-    )
+# ================================ GOOGLE ================================
+def _google(funzione):
+    """Esegue una funzione Google e trasforma gli errori in JSON."""
     try:
-        with urllib.request.urlopen(req, timeout=60) as r:
-            return app.response_class(r.read(), status=r.status, mimetype="application/json")
-    except urllib.error.HTTPError as e:
-        return app.response_class(e.read(), status=e.code, mimetype="application/json")
-    except (urllib.error.URLError, OSError):
-        return jsonify(errore="Servizio WhatsApp spento. Avvialo con avvia_server_jarvis.bat"), 503
+        return jsonify(funzione())
+    except Exception as e:
+        return jsonify(errore=str(e)), 400
 
 
-# -------------------------------- API: GMAIL --------------------------------
 @app.route("/api/gmail/lista")
 @richiede_accesso
 def gmail_lista():
-    try:
-        import gmail_reader
+    import gmail_reader
 
-        q = request.args.get("q", "is:unread")
-        tutta = request.args.get("tutta") == "1"
-        return jsonify(gmail_reader.elenca_email(q, config.EMAIL_DA_MOSTRARE, not tutta))
-    except Exception as e:  # credenziali mancanti, rete, ecc.
-        return jsonify(errore=str(e)), 400
+    q = request.args.get("q", "is:unread")
+    return _google(lambda: gmail_reader.elenca_email(q, config.EMAIL_DA_MOSTRARE, request.args.get("tutta") != "1"))
 
 
 @app.route("/api/gmail/email/<id_messaggio>")
 @richiede_accesso
 def gmail_email(id_messaggio):
-    try:
-        import gmail_reader
+    import gmail_reader
 
-        return jsonify(gmail_reader.leggi_email(id_messaggio))
-    except Exception as e:
-        return jsonify(errore=str(e)), 400
+    return _google(lambda: gmail_reader.leggi_email(id_messaggio))
 
 
-# ------------------------------ API: MECCANICA ------------------------------
-@app.route("/api/meccanica", methods=["POST"])
+@app.route("/api/gmail/pulizia")
 @richiede_accesso
-def meccanica():
-    domanda = ((request.get_json(silent=True) or {}).get("domanda") or "").strip()
-    if not domanda:
-        return jsonify(errore="Domanda vuota"), 400
-    risposta, brani = esperto.rispondi(domanda)
-    return jsonify(
-        risposta=risposta,
-        fonti=[{"manuale": b["manuale"], "sezione": b["sezione"]} for b in brani],
-    )
+def gmail_pulizia():
+    import gmail_pulizia as gp
+
+    return _google(gp.analizza)
+
+
+@app.route("/api/gmail/pesanti")
+@richiede_accesso
+def gmail_pesanti():
+    import gmail_pulizia as gp
+
+    return _google(gp.email_pesanti)
+
+
+@app.route("/api/gmail/azione", methods=["POST"])
+@richiede_accesso
+def gmail_azione():
+    import gmail_reader
+
+    d = request.get_json(silent=True) or {}
+    ids = [str(i) for i in d.get("ids", [])][:500]
+    azioni = {"archivia": gmail_reader.archivia, "spam": gmail_reader.segna_spam, "cestina": gmail_reader.cestina}
+    if d.get("azione") == "svuota_cestino":
+        if d.get("conferma") is not True:
+            return jsonify(errore="Serve conferma esplicita."), 400
+        return _google(lambda: {"eliminate": gmail_reader.svuota_cestino()})
+    if d.get("azione") not in azioni:
+        return jsonify(errore="Azione non valida"), 400
+    if not ids:
+        return jsonify(errore=errore_utente("Non hai selezionato nessuna email.")), 400
+    return _google(lambda: {"fatte": azioni[d["azione"]](ids)})
+
+
+@app.route("/api/google/spazio")
+@richiede_accesso
+def google_spazio():
+    import gmail_reader
+
+    return _google(gmail_reader.spazio_account)
+
+
+@app.route("/api/calendario/oggi")
+@richiede_accesso
+def calendario_oggi():
+    import gmail_reader
+
+    return _google(gmail_reader.eventi_oggi)
+
+
+# ================================ TEAMS ================================
+@app.route("/api/teams/nuovi")
+@richiede_accesso
+def teams_nuovi():
+    import teams_reader
+
+    if not teams_reader.configurato():
+        return jsonify(configurato=False, messaggi=[], avvisi=[])
+    return _google(lambda: {"configurato": True, **teams_reader.nuovi_messaggi()})
+
+
+@app.route("/api/teams/visti", methods=["POST"])
+@richiede_accesso
+def teams_visti():
+    import teams_reader
+
+    teams_reader.segna_visti((request.get_json(silent=True) or {}).get("ids", []))
+    return jsonify(ok=True)
+
+
+# ============================= METEO / SISTEMA =============================
+_cache_meteo = {"ora": 0, "dati": None}
+CODICI_METEO = {
+    0: "sereno", 1: "quasi sereno", 2: "parzialmente nuvoloso", 3: "coperto", 45: "nebbia", 48: "nebbia",
+    51: "pioviggine", 53: "pioviggine", 55: "pioviggine", 61: "pioggia debole", 63: "pioggia", 65: "pioggia forte",
+    71: "neve debole", 73: "neve", 75: "neve forte", 80: "rovesci", 81: "rovesci", 82: "rovesci forti",
+    95: "temporale", 96: "temporale con grandine", 99: "temporale con grandine",
+}
+
+
+def _json_url(url):
+    with urllib.request.urlopen(url, timeout=15) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def meteo():
+    if _cache_meteo["dati"] and time.time() - _cache_meteo["ora"] < 900:
+        return _cache_meteo["dati"]
+    citta = getattr(config, "CITTA_METEO", "Milano")
+    g = _json_url("https://geocoding-api.open-meteo.com/v1/search?count=1&language=it&name="
+                  + urllib.parse.quote(citta))["results"][0]
+    m = _json_url(
+        "https://api.open-meteo.com/v1/forecast?timezone=auto&forecast_days=1"
+        f"&latitude={g['latitude']}&longitude={g['longitude']}"
+        "&current=temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m"
+        "&daily=temperature_2m_max,temperature_2m_min")
+    c = m["current"]
+    dati = {"citta": g["name"], "temperatura": round(c["temperature_2m"]),
+            "descrizione": CODICI_METEO.get(c["weather_code"], "n.d."), "codice": c["weather_code"],
+            "vento": round(c["wind_speed_10m"]), "umidita": c["relative_humidity_2m"],
+            "minima": round(m["daily"]["temperature_2m_min"][0]), "massima": round(m["daily"]["temperature_2m_max"][0])}
+    _cache_meteo.update(ora=time.time(), dati=dati)
+    return dati
+
+
+@app.route("/api/meteo")
+@richiede_accesso
+def api_meteo():
+    try:
+        return jsonify(meteo())
+    except Exception as e:
+        return jsonify(errore=f"Meteo non disponibile: {e}"), 503
+
+
+_avvio = time.time()
+
+
+@app.route("/api/sistema")
+@richiede_accesso
+def sistema():
+    dati = {"uptime_ore": round((time.time() - _avvio) / 3600, 1), "msi": {"online": msi.online(), **msi.stato}}
+    try:
+        import psutil
+
+        disco = psutil.disk_usage(os.path.abspath(os.sep))
+        dati.update(cpu=psutil.cpu_percent(interval=None), ram=psutil.virtual_memory().percent,
+                    disco=round(disco.percent))
+    except Exception:
+        pass
+    return jsonify(dati)
+
+
+# ================================ COMANDI ================================
+def _servizi():
+    import gmail_pulizia
+    import gmail_reader
+    import teams_reader
+
+    return {
+        "msi": msi.invia, "wa": wa, "meccanica": esperto.rispondi, "meteo": meteo,
+        "gmail_lista": lambda q: gmail_reader.elenca_email(q, config.EMAIL_DA_MOSTRARE),
+        "gmail_analizza": gmail_pulizia.analizza, "spazio": gmail_reader.spazio_account,
+        "eventi_oggi": gmail_reader.eventi_oggi, "evento": gmail_reader.aggiungi_evento_rapido,
+        "drive_cerca": gmail_reader.cerca_drive, "teams": teams_reader.nuovi_messaggi,
+    }
+
+
+interprete = None
+
+
+@app.route("/api/comando", methods=["POST"])
+@richiede_accesso
+def comando():
+    global interprete
+    if interprete is None:
+        interprete = Interprete(_servizi())
+    d = request.get_json(silent=True) or {}
+    r = interprete.esegui(d.get("testo", ""))
+    if d.get("annuncia"):
+        annuncia(r["testo"], **{k: v for k, v in r.items() if k in ("azione_pannello", "immagine")})
+    return jsonify(r)
+
+
+@app.route("/api/profilo")
+@richiede_accesso
+def profilo():
+    return jsonify(nome=config.NOME_UTENTE, stile_saggio=config.STILE_SAGGIO,
+                   manuali=esperto.manuali_caricati(), insulti=getattr(config, "INSULTI_ATTIVI", True))
 
 
 def avvia():
     host = config.HOST_PANNELLO
-    if host not in ("127.0.0.1", "localhost") and not config.PASSWORD_PANNELLO:
-        print(
-            "ERRORE: per rendere Jarvis raggiungibile da altri dispositivi devi impostare\n"
-            "PASSWORD_PANNELLO in config.py. Avvio annullato."
-        )
+    remoto = host not in ("127.0.0.1", "localhost") or getattr(config, "ACCESSO_REMOTO", False)
+    if remoto and not config.PASSWORD_PANNELLO:
+        print("ERRORE: per rendere Jarvis raggiungibile da altri dispositivi devi impostare\n"
+              "PASSWORD_PANNELLO in config.py. Avvio annullato.")
+        sys.exit(1)
+    if config.PASSWORD_PANNELLO and len(config.PASSWORD_PANNELLO) < 12:
+        print("ERRORE: PASSWORD_PANNELLO troppo corta (minimo 12 caratteri). Avvio annullato.")
         sys.exit(1)
     print(f"Pannello Jarvis attivo su http://localhost:{config.PORTA_PANNELLO}")
     try:
         from waitress import serve
 
-        serve(app, host=host, port=config.PORTA_PANNELLO, threads=8)
+        # clear_untrusted_proxy_headers=False: serve per riconoscere le richieste inoltrate da internet
+        serve(app, host=host, port=config.PORTA_PANNELLO, threads=24, channel_timeout=60,
+              clear_untrusted_proxy_headers=False)
     except ImportError:
         app.run(host=host, port=config.PORTA_PANNELLO, threaded=True)
 

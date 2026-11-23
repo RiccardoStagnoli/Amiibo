@@ -1,10 +1,12 @@
 """
-Jarvis - Lettore Gmail (sola lettura).
+Jarvis - Accesso all'account Google (Gmail, Calendario, Drive).
 
-Usa la Gmail API ufficiale di Google (gratuita).
-Al primo avvio apre il browser per chiederti il permesso di LEGGERE la posta.
-Jarvis non puo' inviare, cancellare o modificare email: il permesso richiesto
-e' solo "gmail.readonly".
+Usa le API ufficiali di Google (gratuite).
+Permessi richiesti (accesso completo, come richiesto):
+  - Gmail completo (leggere, archiviare, segnare come spam, cestinare, eliminare)
+  - Google Calendar
+  - Google Drive
+Al primo avvio (e quando cambiano i permessi) apre il browser per il consenso.
 """
 
 import base64
@@ -18,8 +20,11 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
-# Permesso richiesto: SOLO lettura.
-SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
+SCOPES = [
+    "https://mail.google.com/",
+    "https://www.googleapis.com/auth/calendar",
+    "https://www.googleapis.com/auth/drive",
+]
 
 CARTELLA = os.path.dirname(os.path.abspath(__file__))
 FILE_CREDENZIALI = os.path.join(CARTELLA, "credentials.json")  # scaricato da Google Cloud
@@ -40,6 +45,9 @@ def _ottieni_credenziali():
     creds = None
     if os.path.exists(FILE_TOKEN):
         creds = Credentials.from_authorized_user_file(FILE_TOKEN, SCOPES)
+
+    if creds and not creds.has_scopes(SCOPES):
+        creds = None  # permessi cambiati: serve un nuovo consenso
 
     if creds and creds.valid:
         return creds
@@ -62,8 +70,8 @@ def _ottieni_credenziali():
     return creds
 
 
-def _servizio():
-    return build("gmail", "v1", credentials=_ottieni_credenziali(), cache_discovery=False)
+def _servizio(nome="gmail", versione="v1"):
+    return build(nome, versione, credentials=_ottieni_credenziali(), cache_discovery=False)
 
 
 def _intestazione(headers, nome):
@@ -165,3 +173,92 @@ def leggi_email(id_messaggio):
         raise
     except Exception as e:
         raise ErroreGmail("Errore durante l'apertura dell'email: " + str(e)) from e
+
+
+# ----------------------------- AZIONI SU GMAIL -----------------------------
+def archivia(ids):
+    """Toglie le email dalla Posta in arrivo (restano in "Tutti i messaggi")."""
+    if ids:
+        _servizio().users().messages().batchModify(
+            userId="me", body={"ids": list(ids), "removeLabelIds": ["INBOX"]}
+        ).execute()
+    return len(ids)
+
+
+def segna_spam(ids):
+    srv = _servizio()
+    for i in ids:
+        srv.users().messages().modify(
+            userId="me", id=i, body={"addLabelIds": ["SPAM"], "removeLabelIds": ["INBOX"]}
+        ).execute()
+    return len(ids)
+
+
+def cestina(ids):
+    """Sposta nel cestino (Gmail lo svuota da solo dopo 30 giorni)."""
+    srv = _servizio()
+    for i in ids:
+        srv.users().messages().trash(userId="me", id=i).execute()
+    return len(ids)
+
+
+def svuota_cestino():
+    """Elimina DEFINITIVAMENTE tutte le email nel cestino. Irreversibile."""
+    srv = _servizio()
+    totale = 0
+    while True:
+        r = srv.users().messages().list(userId="me", labelIds=["TRASH"], maxResults=500).execute()
+        ids = [m["id"] for m in r.get("messages", [])]
+        if not ids:
+            return totale
+        srv.users().messages().batchDelete(userId="me", body={"ids": ids}).execute()
+        totale += len(ids)
+
+
+def conta(query):
+    r = _servizio().users().messages().list(userId="me", q=query, maxResults=500).execute()
+    return r.get("resultSizeEstimate", 0)
+
+
+# ------------------------------ DRIVE / SPAZIO ------------------------------
+def spazio_account():
+    """Spazio usato dall'account Google (Gmail + Drive + Foto), in byte."""
+    q = _servizio("drive", "v3").about().get(fields="storageQuota").execute()["storageQuota"]
+    return {k: int(v) for k, v in q.items() if str(v).isdigit()}
+
+
+def cerca_drive(testo, massimo=10):
+    sicuro = testo.replace("\\", "").replace("'", "\\'")
+    r = _servizio("drive", "v3").files().list(
+        q=f"name contains '{sicuro}' and trashed = false",
+        pageSize=massimo,
+        fields="files(id,name,mimeType,modifiedTime,webViewLink)",
+        orderBy="modifiedTime desc",
+    ).execute()
+    return r.get("files", [])
+
+
+# -------------------------------- CALENDARIO --------------------------------
+def eventi_oggi():
+    from datetime import datetime, time, timedelta
+
+    adesso = datetime.now().astimezone()
+    inizio = datetime.combine(adesso.date(), time.min, adesso.tzinfo)
+    fine = inizio + timedelta(days=1)
+    r = _servizio("calendar", "v3").events().list(
+        calendarId="primary", timeMin=inizio.isoformat(), timeMax=fine.isoformat(),
+        singleEvents=True, orderBy="startTime",
+    ).execute()
+    eventi = []
+    for e in r.get("items", []):
+        inizio_ev = e.get("start", {}).get("dateTime") or e.get("start", {}).get("date")
+        eventi.append({"titolo": e.get("summary", "(senza titolo)"), "inizio": inizio_ev,
+                       "luogo": e.get("location", "")})
+    return eventi
+
+
+def aggiungi_evento_rapido(testo):
+    """Crea un evento dal testo libero (interpretato da Google, es. 'Dentista domani alle 15')."""
+    e = _servizio("calendar", "v3").events().quickAdd(calendarId="primary", text=testo).execute()
+    return {"titolo": e.get("summary"), "inizio": e.get("start", {}).get("dateTime") or e.get("start", {}).get("date"),
+            "link": e.get("htmlLink")}

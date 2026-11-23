@@ -174,14 +174,35 @@ class EspertoMeccanica:
         punteggi.sort(reverse=True)
         return [dict(self.brani[i], punteggio=round(s, 2)) for s, i in punteggi[:quanti]]
 
+    def copertura(self, domanda, brani):
+        """Quota (0..1) dei termini della domanda presenti nei brani trovati."""
+        gruppi = []
+        for p in re.findall(r"[a-zA-ZÀ-ÿ]+", domanda):
+            n = _normalizza(p)
+            if len(n) < 3 or n in PAROLE_VUOTE or n in ("come", "cosa", "serve"):
+                continue
+            gruppi.append({_radice(n)} | {_radice(s) for s in SINONIMI.get(n, [])})
+        if not gruppi:
+            return 0.0
+        presenti = set()
+        for b in brani:
+            presenti.update(_parole(b["sezione"] + " " + b["testo"]))
+        return sum(1 for g in gruppi if g & presenti) / len(gruppi)
+
     def rispondi(self, domanda):
         """
         Restituisce (testo_risposta, brani_usati).
-        La risposta si basa solo sui brani del manuale.
+        La risposta si basa solo sui brani del manuale e viene data solo se
+        almeno il 90% dei termini della domanda compare nel manuale.
         """
         brani = self.cerca(domanda, quanti=config.BRANI_PER_RISPOSTA)
         if not brani:
             return ("Il manuale non contiene informazioni su questo argomento.", [])
+        soglia = getattr(config, "SOGLIA_CERTEZZA", 0.90)
+        cop = self.copertura(domanda, brani)
+        if cop < soglia:
+            return (f"Dati insufficienti per verificare: il manuale copre solo il {round(cop * 100)}% "
+                    "dei termini della domanda. Non rispondo.", [])
 
         risposta_ai = _chiedi_a_ollama(domanda, brani)
         if risposta_ai:
@@ -201,7 +222,8 @@ def _chiedi_a_ollama(domanda, brani):
         f"[{n}] (Sezione: {b['sezione']})\n{b['testo']}" for n, b in enumerate(brani, 1)
     )
     istruzioni = (
-        "Sei Jarvis, assistente personale. Rispondi in italiano, in modo chiaro e conciso. "
+        "Sei Jarvis, assistente personale. Rispondi in italiano, in modo serio, preciso e conciso: "
+        "niente complimenti, niente giri di parole, niente frasi di cortesia. "
         "Usa ESCLUSIVAMENTE le informazioni contenute negli ESTRATTI DEL MANUALE forniti. "
         "Non aggiungere conoscenze esterne. Se gli estratti non contengono la risposta, "
         "rispondi esattamente: 'Il manuale non contiene questa informazione.' "

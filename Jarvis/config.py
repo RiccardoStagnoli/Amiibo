@@ -26,8 +26,43 @@ PORTA_PANNELLO = 8080
 #               (in quel caso PASSWORD_PANNELLO e' obbligatoria).
 HOST_PANNELLO = "127.0.0.1"
 PASSWORD_PANNELLO = ""
+# True se usi Tailscale (o simili) per usare Jarvis fuori casa / dal Rabbit R1.
+# In quel caso PASSWORD_PANNELLO (almeno 12 caratteri) e' obbligatoria.
+ACCESSO_REMOTO = False
 
 # ------------------------- ATTIVAZIONE VOCALE -------------------------
 FRASE_ATTIVAZIONE = "jarvis attivazione"
+# Modello vocale offline:
+#  "vosk-model-small-it-0.22" = leggero (50 MB), sbaglia spesso i comandi dopo l'attivazione
+#  "vosk-model-it-0.22"       = piu preciso (1,3 GB da scaricare, usa molta piu RAM)
+MODELLO_VOSK = "vosk-model-small-it-0.22"
 # Browser usato per aprire il pannello: "edge" oppure "chrome".
 BROWSER = "edge"
+
+# ------------------------- PERSONALITA' -------------------------
+# Jarvis agisce/risponde solo se e' sicuro almeno al 90%.
+SOGLIA_CERTEZZA = 0.90
+# Insulti quando sbagli TU (comando vuoto, nome inesistente, password errata...).
+INSULTI_ATTIVI = True
+
+# ------------------------- METEO (Open-Meteo, gratis) -------------------------
+CITTA_METEO = "Milano"
+
+# ------------------------- GMAIL: pulizia -------------------------
+# Mittenti o domini da non toccare MAI nella pulizia (es. "scuola.it", "banca.it").
+MITTENTI_PROTETTI = []
+
+# ------------------------- PC MSI (controllo remoto) -------------------------
+# Token segreto condiviso con l'agente sul PC Msi (GUIDA, Fase 13).
+# Lascia vuoto per disattivare il controllo del PC Msi.
+TOKEN_AGENTE_MSI = ""
+
+# ------------------------- TEAMS (GUIDA, Fase 12) -------------------------
+TEAMS_CLIENT_ID = ""
+# "organizations" oppure il dominio della scuola, es. "scuola.edu.it"
+TEAMS_TENANT = "organizations"
+# Nomi (o parti di nome) dei professori. Lista vuota = tutti i messaggi.
+TEAMS_PROFESSORI = []
+# Leggere anche i post nei canali dei corsi: richiede il consenso dell'amministratore della scuola.
+# Lascialo False finche' la scuola non approva, altrimenti l'accesso a Teams puo' fallire del tutto.
+TEAMS_LEGGI_CANALI = False

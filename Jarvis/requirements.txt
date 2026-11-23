@@ -6,3 +6,5 @@ flask>=3.0
 waitress>=3.0
 vosk>=0.3.45
 sounddevice>=0.4
+msal>=1.28
+psutil>=5.9

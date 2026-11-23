@@ -3,6 +3,9 @@ JARVIS - Attivazione vocale.
 
 Ascolta il microfono del PC (tutto in locale, gratis, senza internet) e quando
 senti la frase "Jarvis attivazione" apre il pannello di Jarvis.
+Subito dopo resta in ascolto per SECONDI_COMANDO secondi: se dici un comando
+(es. "apri chrome e cerca youtube") lo invia a Jarvis, che risponde a voce
+dal pannello.
 
 Riconoscimento vocale: Vosk + modello italiano piccolo (circa 50 MB), scaricato
 automaticamente al primo avvio nella cartella "modelli".
@@ -22,10 +25,12 @@ import config
 
 CARTELLA = os.path.dirname(os.path.abspath(__file__))
 CARTELLA_MODELLI = os.path.join(CARTELLA, "modelli")
-NOME_MODELLO = "vosk-model-small-it-0.22"
+NOME_MODELLO = getattr(config, "MODELLO_VOSK", "vosk-model-small-it-0.22")
 URL_MODELLO = f"https://alphacephei.com/vosk/models/{NOME_MODELLO}.zip"
 PROFILO_BROWSER = os.path.join(CARTELLA, "dati", "browser_jarvis")
 PAUSA_TRA_ATTIVAZIONI = 10  # secondi
+SECONDI_COMANDO = 7
+FILE_TOKEN = os.path.join(CARTELLA, "dati", ".token_interno")
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
@@ -39,7 +44,7 @@ def prepara_modello():
         return percorso
     os.makedirs(CARTELLA_MODELLI, exist_ok=True)
     zip_locale = os.path.join(CARTELLA_MODELLI, NOME_MODELLO + ".zip")
-    print("Scarico il modello vocale italiano (circa 50 MB, solo la prima volta)...")
+    print(f"Scarico il modello vocale {NOME_MODELLO} (solo la prima volta, puo' richiedere tempo)...")
     urllib.request.urlretrieve(URL_MODELLO, zip_locale)
     with zipfile.ZipFile(zip_locale) as z:
         z.extractall(CARTELLA_MODELLI)
@@ -84,6 +89,43 @@ def apri_pannello():
         webbrowser.open(url)
 
 
+def invia_comando(testo):
+    try:
+        with open(FILE_TOKEN, encoding="utf-8") as f:
+            token = f.read().strip()
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{config.PORTA_PANNELLO}/api/comando",
+            data=json.dumps({"testo": testo, "annuncia": True}).encode("utf-8"),
+            headers={"Content-Type": "application/json", "X-Token-Interno": token},
+        )
+        with urllib.request.urlopen(req, timeout=60) as r:
+            print("Jarvis:", json.loads(r.read().decode("utf-8")).get("testo"))
+    except Exception as e:
+        print("Comando non inviato:", e)
+
+
+def ascolta_comando(coda, modello):
+    """Riconoscimento libero (tutte le parole) per qualche secondo."""
+    from vosk import KaldiRecognizer
+
+    libero = KaldiRecognizer(modello, 16000)
+    fine = time.time() + SECONDI_COMANDO
+    parti = []
+    while time.time() < fine:
+        try:
+            dati = coda.get(timeout=0.5)
+        except queue.Empty:
+            continue
+        if libero.AcceptWaveform(dati):
+            t = json.loads(libero.Result()).get("text", "")
+            if t:
+                parti.append(t)
+                break  # frase completa
+    if not parti:
+        parti.append(json.loads(libero.FinalResult()).get("text", ""))
+    return " ".join(p for p in parti if p).strip()
+
+
 def main():
     try:
         import sounddevice as sd
@@ -122,6 +164,12 @@ def main():
                     ultima = time.time()
                     print(time.strftime("[%H:%M:%S]"), "Attivazione riconosciuta: apro il pannello.")
                     apri_pannello()
+                    print(f"Ti ascolto per {SECONDI_COMANDO} secondi...")
+                    comando = ascolta_comando(coda, modello)
+                    if comando:
+                        print("Comando sentito:", comando)
+                        invia_comando(comando)
+                    riconoscitore = KaldiRecognizer(modello, 16000, grammatica)
 
 
 if __name__ == "__main__":
