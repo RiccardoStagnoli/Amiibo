@@ -1,33 +1,34 @@
 # JARVIS – Guida di installazione (Windows 11)
 
-Funzioni di questa versione:
+Jarvis gira su un **PC che fa da server** (sempre acceso). Funzioni:
 
-1. **Lettura di Gmail** (sola lettura: Jarvis non può inviare, cancellare o modificare email).
-2. **Risposte di meccanica** basate **solo** sul manuale nella cartella `manuali`.
-3. **Segreteria WhatsApp**: risponde a chi ti scrive, registra il messaggio finché la persona invia `1`, e Jarvis te lo rilegge (anche a voce) appena lo apri.
+1. **Pannello futuristico** nel browser (`http://localhost:8080`), che si apre dicendo **"Jarvis attivazione"** al microfono del PC.
+2. **Voce** in stile "vecchio saggio maestro": tono basso, lento, frasi con verbo e soggetto invertiti ("Nuovi messaggi, tre tu hai").
+3. **WhatsApp**: legge i messaggi (escluse le chat che scegli), risponde, inoltra, vota nei sondaggi. La **segreteria automatica** risponde solo alle chat che decidi tu.
+4. **Gmail** in sola lettura.
+5. **Meccanica**: risposte basate **solo** sul manuale nella cartella `manuali`.
 
-Costo: zero. Si usano la Gmail API di Google (gratuita), Python (gratuito) e, opzionale, Ollama (intelligenza artificiale locale gratuita).
+Costo: zero. Python, Node.js, Vosk (riconoscimento vocale offline), Gmail API e, facoltativo, Ollama sono gratuiti.
 
-Cartella finale del progetto: **`C:\Jarvis`**
+Cartella del progetto: **`C:\Jarvis`**
 
 ```
 C:\Jarvis\
- ├─ jarvis.py              programma principale
- ├─ gmail_reader.py        lettura Gmail
- ├─ meccanica.py           risposte di meccanica
- ├─ config.py              impostazioni
- ├─ requirements.txt       elenco librerie
- ├─ installa.bat           installa le librerie (una volta sola)
- ├─ avvia_jarvis.bat       avvia Jarvis
- ├─ installa_whatsapp.bat           installa la segreteria WhatsApp (una volta sola)
- ├─ avvia_segreteria_whatsapp.bat   avvia la segreteria WhatsApp
- ├─ whatsapp_reader.py     lettura dei messaggi registrati
- ├─ voce.py                voce di Jarvis
- ├─ whatsapp\              programma della segreteria
- ├─ dati\                  messaggi e vocali registrati (creata da sola)
- ├─ credentials.json       lo scarichi tu da Google (Fase 3)
- └─ manuali\
-     └─ la_vettura_automobile_1907.txt
+ ├─ avvia_server_jarvis.bat   AVVIA TUTTO (WhatsApp + pannello + ascolto vocale)
+ ├─ installa.bat              installa le librerie Python (una volta sola)
+ ├─ installa_whatsapp.bat     installa il servizio WhatsApp (una volta sola)
+ ├─ servizio_loop.bat         usato da avvia_server_jarvis.bat (non aprirlo)
+ ├─ avvia_jarvis.bat          vecchia versione a menu testuale (facoltativa)
+ ├─ config.py                 impostazioni (nome, porta, password, frase di attivazione)
+ ├─ server.py                 pannello web
+ ├─ ascolto.py                attivazione vocale "Jarvis attivazione"
+ ├─ gmail_reader.py, meccanica.py, whatsapp_reader.py, voce.py, jarvis.py
+ ├─ web\                      grafica del pannello
+ ├─ whatsapp\                 servizio WhatsApp
+ ├─ manuali\                  manuale di meccanica
+ ├─ modelli\                  modello vocale italiano (scaricato da solo, ~50 MB)
+ ├─ dati\                     messaggi, vocali, impostazioni (creata da sola)
+ └─ credentials.json          lo scarichi tu da Google (Fase 3)
 ```
 
 ---
@@ -82,9 +83,9 @@ Doppio clic su **`C:\Jarvis\installa.bat`**. Attendi il messaggio `Installazione
 
 Se Windows mostra "Windows ha protetto il PC": **Ulteriori informazioni** → **Esegui comunque**.
 
-## Fase 5 – Primo avvio
+## Fase 5 – Primo accesso a Gmail
 
-1. Doppio clic su **`C:\Jarvis\avvia_jarvis.bat`**.
+1. Doppio clic su **`C:\Jarvis\avvia_jarvis.bat`** (menu testuale, serve solo per il primo accesso a Gmail).
 2. Scegli `1` e premi Invio.
 3. Si apre il browser:
    - scegli il tuo account Gmail;
@@ -124,45 +125,82 @@ Con Ollama, Jarvis scrive una risposta in italiano **usando solo quei passaggi**
 Per usare un altro modello, modifica `MODELLO_OLLAMA` in `C:\Jarvis\config.py` con il Blocco note.
 Requisiti hardware indicativi: almeno 8 GB di RAM. Su PC lenti la risposta può richiedere decine di secondi.
 
-## Fase 7 – Segreteria WhatsApp
+## Fase 7 – Servizio WhatsApp
 
-> **Rischio da conoscere prima:** la segreteria usa `whatsapp-web.js`, una libreria **non ufficiale** che collega il tuo WhatsApp come se fosse WhatsApp Web. È gratuita, ma **viola i termini di servizio di WhatsApp**: il tuo numero può essere **sospeso o bannato**. Usala a tuo rischio.
+> **Rischio da conoscere prima:** il servizio usa `whatsapp-web.js`, una libreria **non ufficiale** che collega il tuo WhatsApp come se fosse WhatsApp Web. È gratuita, ma **viola i termini di servizio di WhatsApp**: il tuo numero può essere **sospeso o bannato**. Usala a tuo rischio.
 
-Cosa fa:
-
-- Quando qualcuno ti scrive **in privato** (i gruppi vengono ignorati), risponde:
-  *"Riccardo non è al momento raggiungibile, cosa volevi dirgli? Scrivi il tuo messaggio (anche più messaggi o vocali) e poi invia 1 per finire il messaggio."*
-- Registra tutto quello che la persona scrive, vocali compresi, finché invia `1`. Poi risponde *"Grazie, messaggio registrato. Lo riferirò a Riccardo appena possibile."*
-- Se la persona non invia `1`, la registrazione si chiude da sola dopo 15 minuti senza nuovi messaggi.
-- Alla stessa persona l'avviso viene rimandato solo dopo 3 ore. Nel frattempo i suoi messaggi vengono registrati lo stesso.
-- Se qualcuno ti **chiama su WhatsApp**, la chiamata viene rifiutata e la persona riceve un messaggio che la invita a scrivere e a premere `1` per finire.
-- **Funziona solo mentre il PC è acceso e la finestra della segreteria è aperta.**
-
-Installazione:
-
-1. Installa **Node.js** (gratuito): <https://nodejs.org/> → scarica la versione **LTS** per Windows → installa con le opzioni predefinite.
+1. Installa **Node.js** (gratuito): <https://nodejs.org/> → versione **LTS** per Windows → opzioni predefinite.
 2. Doppio clic su **`C:\Jarvis\installa_whatsapp.bat`** e attendi `Installazione completata.` (alcuni minuti).
-3. Doppio clic su **`C:\Jarvis\avvia_segreteria_whatsapp.bat`**. Compare un **codice QR**.
-4. Sul telefono: WhatsApp → **Impostazioni** (o i tre puntini) → **Dispositivi collegati** → **Collega un dispositivo** → inquadra il QR.
-5. Quando compare `Segreteria WhatsApp ATTIVA`, lascia aperta la finestra (puoi ridurla a icona). Il QR non servirà più alle aperture successive.
 
-Avvio automatico all'accensione del PC (facoltativo):
+## Fase 8 – Avviare Jarvis come server
 
-1. Premi `Win + R`, scrivi `shell:startup` e premi Invio: si apre la cartella Esecuzione automatica.
-2. Clic destro su `C:\Jarvis\avvia_segreteria_whatsapp.bat` → **Mostra altre opzioni** → **Crea collegamento**.
-3. Sposta il collegamento creato nella cartella Esecuzione automatica.
+1. Doppio clic su **`C:\Jarvis\installa.bat`** (di nuovo: aggiunge pannello e riconoscimento vocale).
+2. Doppio clic su **`C:\Jarvis\avvia_server_jarvis.bat`**. Si aprono 3 finestre ridotte a icona: **WhatsApp**, **Pannello**, **Ascolto**. Non chiuderle: se un servizio si ferma, riparte da solo dopo 15 secondi.
+   Al primo avvio la finestra "Ascolto" scarica il modello vocale italiano (~50 MB).
+3. Apri **<http://localhost:8080>** → sezione **Impostazioni** → compare il **codice QR**. Sul telefono: WhatsApp → **Dispositivi collegati** → **Collega un dispositivo** → inquadralo. Va fatto una volta sola.
+4. Se Windows chiede di consentire l'accesso alla rete a Python o Node.js, consenti solo le **reti private**.
 
-Cosa succede quando apri Jarvis:
+### Attivazione vocale
 
-- Jarvis dice *"Bentornato. Hai N nuovi messaggi WhatsApp"*, poi per ogni persona ti legge, a schermo e a voce, cosa ha scritto.
-- Per i messaggi vocali, scrivi il numero e si apre il lettore audio di Windows.
-- I messaggi letti non vengono ripetuti. Con il tasto `5` del menu rileggi quelli di oggi.
-- Le persone che stanno ancora scrivendo vengono mostrate con *[sta ancora scrivendo]* e ripetute alla volta successiva.
+- Di' chiaramente **"Jarvis attivazione"** vicino al microfono del PC: si apre il pannello a tutto schermo e Jarvis ti fa il **rapporto**:
+  1. saluto;
+  2. messaggi lasciati in segreteria, letti uno per uno;
+  3. chat WhatsApp con messaggi non letti (fino a 5 chat, ultimi 5 messaggi ciascuna), escluse le chat escluse;
+  4. numero di email non lette.
+- Il riconoscimento avviene **sul PC, senza internet**: l'audio non viene inviato a nessuno.
+- Per cambiare la frase: `FRASE_ATTIVAZIONE` in `config.py` (solo parole italiane comuni o "jarvis").
+- Il pannello si apre con Microsoft Edge (o Chrome: `BROWSER = "chrome"` in `config.py`) in una finestra dedicata.
+- Se il browser blocca la voce compare la scritta *"Tocca lo schermo per attivare la voce"*: cliccala una volta.
+- Con il pannello aperto, i nuovi messaggi in segreteria vengono annunciati a voce appena arrivano (controllo ogni 20 secondi).
 
-Per modificare i testi o i tempi, apri `C:\Jarvis\whatsapp\segreteria_whatsapp.js` con il Blocco note e cambia la sezione `IMPOSTAZIONI` all'inizio del file.
-Per scollegare WhatsApp: sul telefono → **Dispositivi collegati** → tocca il dispositivo → **Disconnetti**.
+### La voce "da saggio maestro"
 
-## Fase 8 – Chiamate normali al cellulare (Vodafone): NON automatizzabili gratis
+Jarvis parla con frasi invertite ("Inviato, il messaggio è") e con tono basso e lento. **Non** è la voce originale di Yoda: quella appartiene ai suoi doppiatori e a Lucasfilm e non è disponibile gratis né legalmente clonabile. È un effetto ottenuto con le voci italiane di Windows.
+
+In **Impostazioni → Voce** puoi:
+- scegliere la voce. Per l'effetto migliore usa una voce **non "Natural"** (es. Microsoft Elsa o Cosimo): le voci "Natural" ignorano il tono;
+- regolare **tono** (più a sinistra = più profondo) e **velocità**;
+- attivare o spegnere la parlata da saggio maestro;
+- premere **Prova voce**.
+
+Mancano voci italiane? Impostazioni di Windows → **Ora e lingua** → **Voce** → **Aggiungi voci** → Italiano.
+
+### WhatsApp dal pannello
+
+| Azione | Dove |
+|---|---|
+| Leggere una chat | Sezione WhatsApp → clic sulla chat |
+| Rispondere | Scrivi in basso e premi **Invia**. Con **Rispondi** sotto un messaggio rispondi citandolo. **Mic** = dettatura (in Edge/Chrome, usa il servizio vocale online del browser) |
+| Inoltrare | **Inoltra** sotto il messaggio → spunta le chat → **Inoltra** (funziona verso chat con cui hai già scritto) |
+| Votare un sondaggio | Seleziona l'opzione sotto il sondaggio → **Vota** |
+| Escludere una chat | Apri la chat → **Escludi chat**. Jarvis non la legge, non la annuncia e non le risponde. Per riammetterla: Impostazioni → Chat escluse → **Rimuovi** |
+| Farsi ascoltare un messaggio | **Leggi** sotto il messaggio |
+
+### Segreteria automatica (solo dove decidi tu)
+
+In **Impostazioni → Segreteria automatica** scegli:
+- **Solo le chat che scelgo io** (predefinito): attivala per una chat aprendola e spuntando **Risposta automatica**;
+- **Tutte le chat private** (tranne le escluse);
+- **Nessuna**.
+
+Nelle chat con risposta automatica Jarvis scrive:
+*"Riccardo non è al momento raggiungibile, cosa volevi dirgli? Scrivi il tuo messaggio (anche più messaggi o vocali) e poi invia 1 per finire il messaggio."*
+Registra tutto fino al messaggio `1`, poi ringrazia. Senza `1`, chiude dopo 15 minuti di silenzio. Alla stessa persona l'avviso viene ripetuto al massimo ogni 3 ore. Le **chiamate WhatsApp** di quelle chat vengono rifiutate con un messaggio che invita a scrivere. I gruppi non ricevono mai risposte automatiche.
+Testi e tempi: sezione `IMPOSTAZIONI` all'inizio di `C:\Jarvis\whatsapp\servizio_whatsapp.js`.
+
+## Fase 9 – Il PC server
+
+1. **Non far andare in sospensione il PC:** Impostazioni → **Sistema** → **Alimentazione** → *Schermo e sospensione* → sospensione **Mai** (lo schermo può spegnersi).
+2. **Avvio automatico all'accensione:** `Win + R` → `shell:startup` → Invio. Nella cartella che si apre crea un collegamento a `C:\Jarvis\avvia_server_jarvis.bat` (clic destro sul file → *Mostra altre opzioni* → *Crea collegamento*, poi sposta il collegamento lì).
+3. **Accesso automatico a Windows** (facoltativo, perché i programmi partono solo dopo il login): se il PC ha una password, l'avvio automatico funziona solo dopo che hai effettuato l'accesso.
+4. **Usare il pannello dal telefono o da un altro PC della stessa rete Wi-Fi** (facoltativo):
+   - in `config.py` imposta `HOST_PANNELLO = "0.0.0.0"` e una password lunga in `PASSWORD_PANNELLO` (senza password il server non parte);
+   - scopri l'indirizzo del server: Prompt dei comandi → `ipconfig` → riga *Indirizzo IPv4* (es. `192.168.1.20`);
+   - dal telefono apri `http://192.168.1.20:8080`.
+   - **Non** aprire la porta 8080 sul router verso internet: il collegamento non è cifrato.
+5. Il microfono per l'attivazione vocale deve essere collegato al **PC server**.
+
+## Fase 10 – Chiamate normali al cellulare (Vodafone): NON automatizzabili gratis
 
 Non esiste un servizio gratuito che risponda al tuo numero di cellulare, faccia ascoltare un messaggio, registri e si fermi premendo `1`.
 
@@ -189,8 +227,12 @@ Non esiste un servizio gratuito che risponda al tuo numero di cellulare, faccia 
 | `librerie Google mancanti` | Doppio clic su `installa.bat`. |
 | `Errore 403: access_denied` nel browser | Non hai aggiunto la tua email come utente di test (Fase 3, punto 5). |
 | `Gmail API has not been used in project...` | Gmail API non abilitata (Fase 3, punto 3). |
-| Errori di accesso persistenti | Cancella `C:\Jarvis\token.json` e riavvia Jarvis. |
+| Gmail nel pannello dà errore di accesso | Cancella `C:\Jarvis\token.json` e riavvia Jarvis. |
 | "Ollama non attivo o modello non scaricato" | Fase 6. Verifica con `ollama list` nel Prompt dei comandi. |
 | `Node.js non installato` | Fase 7, punto 1. Dopo l'installazione riavvia il PC. |
-| La segreteria non risponde più | WhatsApp aggiorna spesso il suo sito e la libreria smette di funzionare. Esegui di nuovo `installa_whatsapp.bat` per scaricare l'ultima versione. Se non basta, cancella la cartella `C:\Jarvis\whatsapp\sessione` e ricollega col QR. |
+| WhatsApp non funziona più | WhatsApp aggiorna spesso il suo sito e la libreria smette di funzionare. Chiudi le finestre di Jarvis ed esegui di nuovo `installa_whatsapp.bat` per scaricare l'ultima versione. Se non basta, cancella `C:\Jarvis\whatsapp\sessione` e ricollega col QR. |
+| "Jarvis attivazione" non viene riconosciuto | Controlla nella finestra "JARVIS - Ascolto" che non ci siano errori. Impostazioni di Windows → Sistema → Audio → Input: scegli il microfono giusto e alza il volume. Parla vicino al microfono, scandendo. |
+| La finestra "Ascolto" dà errore sul microfono | Impostazioni → Privacy e sicurezza → Microfono → attiva "Consenti alle app desktop di accedere al microfono". |
+| Il pannello dice "Servizio WhatsApp spento" | La finestra "JARVIS - WhatsApp" è chiusa o in errore: riavvia `avvia_server_jarvis.bat`. |
+| Pagina `localhost:8080` non raggiungibile | La finestra "JARVIS - Pannello" è chiusa o in errore: leggi il messaggio e riavvia `avvia_server_jarvis.bat`. |
 | Jarvis non parla | La voce usa la sintesi vocale di Windows. Per una voce italiana: Impostazioni → Ora e lingua → Voce → Aggiungi voci → Italiano. Per spegnere la voce: `VOCE_ATTIVA = False` in `config.py`. |

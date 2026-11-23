@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>J.A.R.V.I.S.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/web/style.css">
+</head>
+<body>
+<div class="griglia-sfondo" aria-hidden="true"></div>
+
+<header class="barra">
+  <div class="logo">J.A.R.V.I.S.</div>
+  <div class="stati">
+    <span class="pillola" id="stato-wa">WhatsApp ...</span>
+    <span class="pillola" id="stato-voce">Voce ...</span>
+    <span class="orologio" id="orologio">--:--</span>
+  </div>
+</header>
+
+<nav class="menu" id="menu">
+  <button data-sezione="centrale" class="attivo">Centrale</button>
+  <button data-sezione="whatsapp">WhatsApp</button>
+  <button data-sezione="gmail">Gmail</button>
+  <button data-sezione="meccanica">Meccanica</button>
+  <button data-sezione="impostazioni">Impostazioni</button>
+</nav>
+
+<main>
+  <!-- CENTRALE -->
+  <section id="centrale" class="sezione visibile">
+    <div class="nucleo-zona">
+      <svg class="nucleo" id="nucleo" viewBox="0 0 200 200" aria-hidden="true">
+        <circle class="anello a1" cx="100" cy="100" r="92"/>
+        <circle class="anello a2" cx="100" cy="100" r="78"/>
+        <circle class="anello a3" cx="100" cy="100" r="64"/>
+        <circle class="anello a4" cx="100" cy="100" r="50"/>
+        <circle class="cuore" cx="100" cy="100" r="30"/>
+        <text x="100" y="105" text-anchor="middle" class="nucleo-testo">JARVIS</text>
+      </svg>
+      <p class="parlato" id="parlato">In attesa.</p>
+      <div class="azioni">
+        <button class="btn" id="btn-rapporto">Rapporto completo</button>
+        <button class="btn sec" id="btn-zitto">Silenzio</button>
+      </div>
+    </div>
+    <div class="pannello">
+      <h2>Segreteria WhatsApp</h2>
+      <div id="lista-segreteria" class="lista"></div>
+    </div>
+  </section>
+
+  <!-- WHATSAPP -->
+  <section id="whatsapp" class="sezione">
+    <div class="wa">
+      <div class="pannello wa-chat">
+        <h2>Chat</h2>
+        <input id="cerca-chat" class="campo" placeholder="Cerca chat...">
+        <div id="lista-chat" class="lista"></div>
+      </div>
+      <div class="pannello wa-conversazione">
+        <div class="wa-testata">
+          <h2 id="titolo-chat">Seleziona una chat</h2>
+          <div class="interruttori" id="interruttori-chat" hidden>
+            <label class="interruttore"><input type="checkbox" id="chk-auto"><span>Risposta automatica</span></label>
+            <button class="btn piccolo pericolo" id="btn-escludi">Escludi chat</button>
+          </div>
+        </div>
+        <div id="messaggi" class="messaggi"></div>
+        <div id="citazione" class="citazione" hidden></div>
+        <form id="form-invio" class="composer" hidden>
+          <input id="testo-invio" class="campo" placeholder="Scrivi la risposta..." autocomplete="off">
+          <button type="button" class="btn sec" id="btn-detta" title="Detta a voce">Mic</button>
+          <button class="btn" type="submit">Invia</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- GMAIL -->
+  <section id="gmail" class="sezione">
+    <div class="pannello">
+      <h2>Gmail</h2>
+      <div class="azioni">
+        <button class="btn" data-gmail="is:unread">Non lette</button>
+        <button class="btn sec" data-gmail="">Ultime</button>
+        <input id="cerca-gmail" class="campo" placeholder="Cerca: from:amazon, fattura...">
+        <button class="btn sec" id="btn-cerca-gmail">Cerca</button>
+      </div>
+      <div id="lista-gmail" class="lista"></div>
+      <article id="email-aperta" class="email" hidden></article>
+    </div>
+  </section>
+
+  <!-- MECCANICA -->
+  <section id="meccanica" class="sezione">
+    <div class="pannello">
+      <h2>Meccanica</h2>
+      <p class="nota" id="nota-manuale"></p>
+      <form id="form-meccanica" class="composer">
+        <input id="domanda" class="campo" placeholder="Es. come funziona il differenziale?" autocomplete="off">
+        <button class="btn" type="submit">Chiedi</button>
+      </form>
+      <div id="risposta-meccanica" class="risposta"></div>
+    </div>
+  </section>
+
+  <!-- IMPOSTAZIONI -->
+  <section id="impostazioni" class="sezione">
+    <div class="pannello">
+      <h2>Collegamento WhatsApp</h2>
+      <div id="qr-zona" class="nota">Controllo...</div>
+    </div>
+    <div class="pannello">
+      <h2>Voce</h2>
+      <label class="riga">Voce <select id="sel-voce" class="campo"></select></label>
+      <label class="riga">Tono <input type="range" id="tono" min="0.1" max="2" step="0.05"></label>
+      <label class="riga">Velocit&agrave; <input type="range" id="velocita" min="0.5" max="1.5" step="0.05"></label>
+      <label class="interruttore"><input type="checkbox" id="chk-saggio"><span>Parlata da saggio maestro</span></label>
+      <label class="interruttore"><input type="checkbox" id="chk-voce"><span>Voce attiva</span></label>
+      <div class="azioni"><button class="btn" id="btn-prova-voce">Prova voce</button></div>
+      <p class="nota">Per l'effetto "vecchio maestro" scegli una voce italiana non "Natural" (es. Microsoft Elsa o Cosimo): le voci "Natural" ignorano il tono.</p>
+    </div>
+    <div class="pannello">
+      <h2>Segreteria automatica</h2>
+      <label class="interruttore"><input type="radio" name="modo" value="scelte"><span>Solo le chat che scelgo io</span></label>
+      <label class="interruttore"><input type="radio" name="modo" value="tutti"><span>Tutte le chat private (tranne escluse)</span></label>
+      <label class="interruttore"><input type="radio" name="modo" value="nessuno"><span>Nessuna</span></label>
+      <h3>Chat con risposta automatica</h3>
+      <div id="lista-auto" class="lista compatta"></div>
+      <h3>Chat escluse (Jarvis le ignora del tutto)</h3>
+      <div id="lista-escluse" class="lista compatta"></div>
+    </div>
+  </section>
+</main>
+
+<div class="sblocca" id="sblocca" hidden>Tocca lo schermo per attivare la voce di Jarvis</div>
+
+<dialog id="dlg-inoltra" class="dialogo">
+  <form method="dialog">
+    <h2>Inoltra a...</h2>
+    <input id="cerca-inoltra" class="campo" placeholder="Cerca...">
+    <div id="lista-inoltra" class="lista compatta"></div>
+    <div class="azioni">
+      <button class="btn sec" value="annulla">Annulla</button>
+      <button class="btn" value="ok" id="btn-conferma-inoltra">Inoltra</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="/web/app.js"></script>
+</body>
+</html>
