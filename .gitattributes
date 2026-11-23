@@ -1,0 +1,2 @@
+# I file .bat devono restare con fine riga Windows (CRLF).
+*.bat -text

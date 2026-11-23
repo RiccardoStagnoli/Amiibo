@@ -1,0 +1,6 @@
+# Credenziali personali Google: NON vanno mai caricate su GitHub.
+credentials.json
+token.json
+client_secret*.json
+__pycache__/
+*.pyc
