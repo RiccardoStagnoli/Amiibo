@@ -66,3 +66,23 @@ TEAMS_PROFESSORI = []
 # Leggere anche i post nei canali dei corsi: richiede il consenso dell'amministratore della scuola.
 # Lascialo False finche' la scuola non approva, altrimenti l'accesso a Teams puo' fallire del tutto.
 TEAMS_LEGGI_CANALI = False
+
+# ------------------------- FUNZIONI EXTRA (GUIDA, Fase 16) -------------------------
+# Riepilogo automatico ogni giorno a quest'ora (formato "HH:MM"). "" = disattivato.
+ORA_RIEPILOGO = "07:00"
+# Manda il riepilogo e i promemoria anche come messaggio WhatsApp a te stesso
+# (chat "Tu"/"Messaggi a te stesso"), utile quando sei fuori casa.
+RIEPILOGO_SU_WHATSAPP = True
+PROMEMORIA_SU_WHATSAPP = True
+
+# Accensione del PC Msi via rete (Wake-on-LAN). Indirizzo MAC della scheda di rete del Msi,
+# es. "1C:2B:3D:4E:5F:60". "" = disattivato.
+MAC_MSI = ""
+BROADCAST_RETE = "255.255.255.255"
+
+# Macro: una frase che esegue piu' comandi in sequenza.
+MACRO = {
+    "modalita gioco": ["apri steam", "apri discord"],
+    "modalita studio": ["non disturbare per 2 ore", "ricordami tra 50 minuti di fare una pausa"],
+    "buonanotte": ["spegni msi", "promemoria"],
+}

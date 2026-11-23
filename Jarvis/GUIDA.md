@@ -310,6 +310,30 @@ Regola del 90%: se il nome del programma o del gioco non corrisponde almeno al 9
 - **Comandi a voce dal PC server**: dopo "Jarvis attivazione" hai 7 secondi per dire il comando. Il modello vocale leggero sbaglia spesso le parole straniere (Chrome, YouTube, Steam). Se capita, in `config.py` imposta `MODELLO_VOSK = "vosk-model-it-0.22"` (più preciso, 1,3 GB da scaricare, usa molta più RAM). Il pulsante **Mic** del pannello usa invece il riconoscimento vocale del browser (online), che di solito è più preciso.
 - **Aspetto** (Impostazioni → Aspetto): 4 temi colore, effetti sonori, particelle animate, sequenza di avvio. Pulsante ⛶ in alto per lo schermo intero.
 
+## Fase 16 – Funzioni extra
+
+| Comando | Cosa fa |
+|---|---|
+| `ricordami tra 20 minuti di studiare storia` | Promemoria. Accetta anche `fra`, `tra un'ora`, `tra mezz'ora`, `alle 18:30 di ...`, `domani alle 8 di ...` |
+| `promemoria` / `cancella promemoria` | Elenca o cancella i promemoria |
+| `annota comprare olio motore` / `leggi le note` / `cancella le note` | Note veloci |
+| `non disturbare per 2 ore` / `fine non disturbare` | La segreteria risponde a **tutte** le chat private per il tempo indicato, poi torna da sola come prima |
+| `riepilogo` | Data, meteo, agenda, email non lette, WhatsApp, segreteria, Teams, promemoria di oggi |
+| `accendi msi` | Accende il PC Msi tramite la rete (vedi sotto) |
+| `modalita gioco`, `modalita studio`, `buonanotte` | **Macro**: più comandi con una frase. Le modifichi in `config.py` → `MACRO` |
+
+- I **promemoria** vengono detti a voce dal pannello aperto e arrivano anche come **messaggio WhatsApp a te stesso** (la chat "Tu" / "Messaggi a te stesso"), quindi li ricevi anche fuori casa. Per disattivarlo: `PROMEMORIA_SU_WHATSAPP = False`.
+- Il **riepilogo automatico** arriva ogni giorno all'ora `ORA_RIEPILOGO` (predefinita `"07:00"`), a voce e su WhatsApp. `""` lo disattiva.
+- Il **registro attività** (Impostazioni) mostra i comandi eseguiti, gli accessi al pannello e le **password sbagliate** con l'indirizzo IP: se vedi accessi che non riconosci, cambia subito `PASSWORD_PANNELLO`.
+
+**Accendere il Msi dalla rete (Wake-on-LAN).** Funziona di solito solo se il Msi è collegato al router **via cavo**; via Wi-Fi quasi mai.
+1. Sul Msi: Prompt dei comandi → `ipconfig /all` → nella scheda **Ethernet** copia l'**Indirizzo fisico** (es. `1C-2B-3D-4E-5F-60`) in `config.py` del server → `MAC_MSI`.
+2. Sul Msi: Gestione dispositivi → Schede di rete → la scheda Ethernet → Proprietà:
+   - scheda **Risparmio energia**: spunta "Consenti al dispositivo di riattivare il computer";
+   - scheda **Avanzate**: imposta "Wake on Magic Packet" su **Abilitato**.
+3. Nel BIOS del Msi attiva la riattivazione da rete. Il nome dell'opzione cambia da scheda madre a scheda madre (es. "Wake On LAN", "Resume by PCI-E Device"): *dati insufficienti per indicarti il nome esatto sul tuo modello.*
+4. Se non si accende da spento, disattiva l'**Avvio rapido** di Windows: Pannello di controllo → Opzioni risparmio energia → Specifica comportamento pulsanti di alimentazione → togli "Attiva avvio rapido".
+
 ## Il manuale di meccanica
 
 - **Titolo:** *La Vettura Automobile – Sue parti, suo funzionamento*

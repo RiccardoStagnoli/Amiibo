@@ -80,11 +80,14 @@ Spunta ogni riga quando l'hai fatta.
   - sul R1 apri l'indirizzo `https://...ts.net/?modo=r1`.
   - Procedura sul R1: **non verificata** (vedi Fase 14).
 
-## E. GitHub (il caricamento del codice è fallito)
+## E. Funzioni extra (Fase 16, facoltative)
 
-- [ ] **24.** Ricollega GitHub su https://claude.ai/connect-github.
-- [ ] **25.** Installa la Claude GitHub App sul repository `RiccardoStagnoli/Amiibo` da https://github.com/apps/claude/installations/select_target.
-- [ ] **26.** Poi chiedi a Claude di fare "push": i commit sono pronti sul branch `claude/jarvis-gmail-reader-k8f67k`.
+- [ ] **24.** In `config.py` scegli `ORA_RIEPILOGO` (es. `"07:00"`) e personalizza le `MACRO`.
+- [ ] **25.** Accensione del Msi dalla rete:
+  - collega il Msi al router via cavo;
+  - copia il suo MAC in `MAC_MSI`;
+  - attiva Wake-on-LAN in Windows e nel BIOS.
+- [ ] **26.** Ogni tanto controlla il **Registro attività** (Impostazioni) per verificare gli accessi.
 
 ## F. Telefono Vodafone (non automatizzabile gratis)
 

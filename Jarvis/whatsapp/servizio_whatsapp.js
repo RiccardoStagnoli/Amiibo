@@ -365,6 +365,13 @@ const rotte = {
     return { ok: true };
   },
 
+  // Messaggio a se stessi (chat "Tu" di WhatsApp): usato per promemoria e riepilogo.
+  'POST /invia_a_me': async (b) => {
+    if (!b.testo) throw new Error('Testo mancante');
+    await client.sendMessage(client.info.wid._serialized, String(b.testo));
+    return { ok: true };
+  },
+
   'POST /inoltra': async (b) => {
     const m = await client.getMessageById(b.messaggio);
     if (!m) throw new Error('Messaggio non trovato');

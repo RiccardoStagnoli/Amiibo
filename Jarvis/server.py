@@ -20,6 +20,7 @@ from functools import wraps
 from flask import Flask, abort, jsonify, redirect, request, send_from_directory, session
 
 import config
+import extra
 import whatsapp_reader
 from comandi import Interprete
 from meccanica import EspertoMeccanica
@@ -94,9 +95,11 @@ def accesso():
                 request.form.get("password", ""), config.PASSWORD_PANNELLO):
             session.permanent = True
             session["autorizzato"] = True
+            extra.registra("accesso", "riuscito", ip)
             return redirect("/")
         else:
             _tentativi.setdefault(ip, []).append(time.time())
+            extra.registra("accesso", "PASSWORD ERRATA", ip)
             messaggio = errore_utente("Password errata.")
     with open(os.path.join(CARTELLA_WEB, "accesso.html"), encoding="utf-8") as f:
         pagina = f.read()
@@ -451,6 +454,8 @@ def _servizi():
         "gmail_analizza": gmail_pulizia.analizza, "spazio": gmail_reader.spazio_account,
         "eventi_oggi": gmail_reader.eventi_oggi, "evento": gmail_reader.aggiungi_evento_rapido,
         "drive_cerca": gmail_reader.cerca_drive, "teams": teams_reader.nuovi_messaggi,
+        "accendi_msi": accendi_msi, "non_disturbare": non_disturbare,
+        "fine_non_disturbare": fine_non_disturbare, "riepilogo": riepilogo,
     }
 
 
@@ -465,9 +470,141 @@ def comando():
         interprete = Interprete(_servizi())
     d = request.get_json(silent=True) or {}
     r = interprete.esegui(d.get("testo", ""))
+    extra.registra("comando", f"{d.get('testo', '')} -> {r['esito']}",
+                   "server (voce)" if _interno() else request.remote_addr)
     if d.get("annuncia"):
         annuncia(r["testo"], **{k: v for k, v in r.items() if k in ("azione_pannello", "immagine")})
     return jsonify(r)
+
+
+# ============================ FUNZIONI EXTRA ============================
+FILE_ND = os.path.join(CARTELLA_DATI, "non_disturbare.json")
+
+
+def accendi_msi():
+    mac = getattr(config, "MAC_MSI", "")
+    if not mac:
+        return {"testo": "Accensione Msi non configurata: manca MAC_MSI in config.py (GUIDA, Fase 16).", "esito": "errore"}
+    if msi.online():
+        return {"testo": "Msi è già acceso.", "esito": "ok"}
+    extra.wake_on_lan(mac, getattr(config, "BROADCAST_RETE", "255.255.255.255"))
+    return {"testo": "Segnale di accensione inviato a Msi. Serve circa un minuto.", "esito": "ok"}
+
+
+def non_disturbare(ore):
+    imp = wa("impostazioni")
+    stato = {"fino": time.time() + ore * 3600, "modo_precedente": imp.get("risposta_automatica", "scelte")}
+    if os.path.exists(FILE_ND):  # gia' attivo: conserva la modalita' originale
+        with open(FILE_ND, encoding="utf-8") as f:
+            stato["modo_precedente"] = json.load(f).get("modo_precedente", stato["modo_precedente"])
+    wa("impostazioni", {"risposta_automatica": "tutti"})
+    with open(FILE_ND, "w", encoding="utf-8") as f:
+        json.dump(stato, f)
+    fine = time.strftime("%H:%M", time.localtime(stato["fino"]))
+    return {"testo": f"Non disturbare attivo fino alle {fine}: la segreteria risponde a tutte le chat private.", "esito": "ok"}
+
+
+def fine_non_disturbare():
+    if not os.path.exists(FILE_ND):
+        return {"testo": "Non disturbare non era attivo.", "esito": "ok"}
+    with open(FILE_ND, encoding="utf-8") as f:
+        precedente = json.load(f).get("modo_precedente", "scelte")
+    wa("impostazioni", {"risposta_automatica": precedente})
+    os.remove(FILE_ND)
+    return {"testo": "Non disturbare terminato. Segreteria ripristinata.", "esito": "ok"}
+
+
+def riepilogo():
+    """Riepilogo della giornata: data, meteo, agenda, posta, WhatsApp, Teams, promemoria."""
+    import gmail_reader
+    import teams_reader
+
+    giorni = ["lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica"]
+    mesi = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto",
+            "settembre", "ottobre", "novembre", "dicembre"]
+    oggi = time.localtime()
+    parti = [f"Riepilogo di {giorni[oggi.tm_wday]} {oggi.tm_mday} {mesi[oggi.tm_mon - 1]}."]
+    try:
+        m = meteo()
+        parti.append(f"Meteo {m['citta']}: {m['descrizione']}, da {m['minima']} a {m['massima']} gradi.")
+    except Exception:
+        pass
+    try:
+        ev = gmail_reader.eventi_oggi()
+        parti.append("Agenda: " + ("; ".join(f"{(e['inizio'] or '')[11:16] or 'giornata'} {e['titolo']}" for e in ev)
+                                   if ev else "nessun impegno") + ".")
+    except Exception:
+        pass
+    try:
+        parti.append(f"Email non lette: {gmail_reader.conta('is:unread in:inbox')}.")
+    except Exception:
+        pass
+    try:
+        chat = [c for c in wa("chat") if c["non_letti"] > 0]
+        parti.append(f"WhatsApp: messaggi non letti in {len(chat)} chat.")
+    except Exception:
+        pass
+    nuovi = [r for r in whatsapp_reader.nuovi() if r.get("stato") == "completato"]
+    if nuovi:
+        parti.append(f"Segreteria: {len(nuovi)} messaggi da " + ", ".join(sorted({r['contatto'] for r in nuovi})) + ".")
+    if teams_reader.configurato():
+        try:
+            parti.append(f"Teams: {len(teams_reader.nuovi_messaggi()['messaggi'])} nuovi messaggi dei professori.")
+        except Exception:
+            pass
+    oggi_iso = time.strftime("%Y-%m-%d")
+    prom = [p for p in extra.promemoria() if p["quando"][:10] == oggi_iso]
+    if prom:
+        parti.append("Promemoria di oggi: " + "; ".join(f"{p['quando'][11:16]} {p['testo']}" for p in prom) + ".")
+    return " ".join(parti)
+
+
+def _a_me(testo):
+    """Messaggio WhatsApp a se stessi (se il servizio e' attivo)."""
+    try:
+        wa("invia_a_me", {"testo": testo})
+    except Exception:
+        pass
+
+
+def pianificatore():
+    """Ogni 20 secondi: promemoria scaduti, fine non disturbare, riepilogo quotidiano."""
+    ultimo_riepilogo = None
+    while True:
+        try:
+            for p in extra.promemoria_scaduti():
+                annuncia("Promemoria: " + p["testo"])
+                extra.registra("promemoria", p["testo"])
+                if getattr(config, "PROMEMORIA_SU_WHATSAPP", True):
+                    _a_me("⏰ Promemoria Jarvis: " + p["testo"])
+            if os.path.exists(FILE_ND):
+                with open(FILE_ND, encoding="utf-8") as f:
+                    fino = json.load(f).get("fino", 0)
+                if time.time() >= fino:
+                    annuncia(fine_non_disturbare()["testo"])
+            ora_r = getattr(config, "ORA_RIEPILOGO", "")
+            oggi = time.strftime("%Y-%m-%d")
+            if ora_r and time.strftime("%H:%M") >= ora_r and ultimo_riepilogo != oggi:
+                ultimo_riepilogo = oggi
+                testo = riepilogo()
+                annuncia(testo)
+                if getattr(config, "RIEPILOGO_SU_WHATSAPP", True):
+                    _a_me("📋 " + testo)
+        except Exception as e:
+            print("Pianificatore:", e)
+        time.sleep(20)
+
+
+@app.route("/api/promemoria")
+@richiede_accesso
+def api_promemoria():
+    return jsonify(promemoria=extra.promemoria(), note=extra.note())
+
+
+@app.route("/api/registro")
+@richiede_accesso
+def api_registro():
+    return jsonify(extra.registro(150))
 
 
 @app.route("/api/profilo")
@@ -488,6 +625,7 @@ def avvia():
         print("ERRORE: PASSWORD_PANNELLO troppo corta (minimo 12 caratteri). Avvio annullato.")
         sys.exit(1)
     print(f"Pannello Jarvis attivo su http://localhost:{config.PORTA_PANNELLO}")
+    threading.Thread(target=pianificatore, daemon=True).start()
     try:
         from waitress import serve
 

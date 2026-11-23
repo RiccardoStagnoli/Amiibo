@@ -11,6 +11,8 @@ import re
 import unicodedata
 from datetime import datetime
 
+import config
+import extra
 from personalita import SOGLIA_CERTEZZA, errore_utente, incerto, saggio
 
 
@@ -29,7 +31,9 @@ AIUTO = (
     "'apri <programma>', 'screenshot msi', 'blocca msi', 'spegni msi', 'leggi messaggi', "
     "'scrivi a <nome>: <testo>', 'leggi la posta', 'pulisci la posta', 'spazio account', "
     "'agenda', 'aggiungi al calendario: ...', 'cerca su drive ...', 'leggi teams', 'meteo', "
-    "'che ore sono', 'meccanica: <domanda>', 'rapporto'."
+    "'che ore sono', 'meccanica: <domanda>', 'rapporto', 'ricordami tra 20 minuti di ...', "
+    "'ricordami alle 18 di ...', 'promemoria', 'annota ...', 'leggi le note', 'accendi msi', "
+    "'non disturbare per 2 ore', 'fine non disturbare', 'riepilogo', e le tue macro (config.py)."
 )
 
 
@@ -48,6 +52,13 @@ class Interprete:
         orig = re.sub(r"^(ehi |ok |hey )?jarvis[,:]? ?", "", orig, flags=re.IGNORECASE)
         if not t:
             return risposta(errore_utente("Non hai detto niente."), "errore_utente")
+
+        # Macro personali definite in config.py (es. "modalita gioco")
+        macro = {normalizza(k): v for k, v in getattr(config, "MACRO", {}).items()}
+        if t in macro:
+            esiti = [self.esegui(c) for c in macro[t]]
+            return risposta(" ".join(e["testo"] for e in esiti),
+                            "ok" if all(e["esito"] == "ok" for e in esiti) else "errore")
 
         regole = [
             (r"^(aiuto|cosa sai fare|comandi)$", lambda m: risposta(AIUTO)),
@@ -80,6 +91,18 @@ class Interprete:
             (r"^(scrivi|manda un messaggio|invia un messaggio) a (?P<n>[^:,]+)[:,] ?(?P<t>.*)$", self.wa_scrivi),
             # --- Teams ---
             (r"^(leggi |controlla )?(teams|messaggi (dei|dei miei) prof(essori)?)$", self.teams),
+            # --- Promemoria, note, modalita' ---
+            (r"^(ricordami|promemoria|ricorda(mi)? di) (?P<q>(tra|fra|alle|domani) .*)$", self.ricorda),
+            (r"^(quali |leggi i |i miei )?promemoria$", self.lista_promemoria),
+            (r"^ricordami$", lambda m: risposta(errore_utente("Ricordarti cosa e quando? Es. 'ricordami tra 20 minuti di studiare'."), "errore_utente")),
+            (r"^(cancella|elimina) (tutti )?(i )?promemoria$", lambda m: (extra.cancella_promemoria(), risposta("Promemoria cancellati."))[1]),
+            (r"^(annota|prendi nota|nota|scrivi una nota)[:,]? ?(?P<t>.*)$", self.annota),
+            (r"^(leggi |mostra )?(le )?(mie )?note$", self.leggi_note),
+            (r"^(cancella|elimina) (tutte )?(le )?note$", lambda m: (extra.cancella_note(), risposta("Note cancellate."))[1]),
+            (r"^accendi (il )?(pc|msi|computer)$", lambda m: self.s["accendi_msi"]()),
+            (r"^(non disturbare|modalita non disturbare)( per (?P<n>\S+) (?P<u>or[ae]|minuti))?$", self.non_disturbare),
+            (r"^(fine|basta|disattiva) (non disturbare|modalita non disturbare)$", lambda m: self.s["fine_non_disturbare"]()),
+            (r"^(riepilogo|briefing)( (di oggi|giornaliero))?$", lambda m: risposta(self.s["riepilogo"]())),
             # --- Meccanica ---
             (r"^meccanica[:,]? ?(?P<q>.*)$", self.meccanica),
             # --- apri programma (va per ultimo tra le regole "apri") ---
@@ -220,3 +243,42 @@ class Interprete:
         testo, brani = self.s["meccanica"](q)
         esito = "ok" if brani else "incerto"
         return risposta(testo, esito, fonti=[{"manuale": b["manuale"], "sezione": b["sezione"]} for b in brani])
+
+    # ------------------------------ Promemoria / note ------------------------------
+    def ricorda(self, m):
+        quando, cosa = extra.interpreta_quando(m["q"])
+        if quando is None:
+            return risposta(errore_utente("Orario non valido. Es. 'tra 20 minuti', 'alle 18:30', 'domani alle 8'."), "errore_utente")
+        if not cosa:
+            return risposta(errore_utente("Ricordarti cosa? Non l'hai detto."), "errore_utente")
+        extra.aggiungi_promemoria(quando, cosa)
+        giorno = "oggi" if quando.date() == datetime.now().date() else "domani" if (quando.date() - datetime.now().date()).days == 1 else quando.strftime("%d/%m")
+        return risposta(f"Promemoria: {giorno} alle {quando:%H:%M}, {cosa}.")
+
+    def lista_promemoria(self, _m):
+        lista = extra.promemoria()
+        if not lista:
+            return risposta("Nessun promemoria.")
+        return risposta("; ".join(f"{datetime.fromisoformat(p['quando']):%d/%m %H:%M} {p['testo']}" for p in lista) + ".")
+
+    def annota(self, m):
+        testo = m["t"].strip()
+        if not testo:
+            return risposta(errore_utente("Annotare cosa? Nota vuota."), "errore_utente")
+        n = extra.aggiungi_nota(testo)
+        return risposta(f"Annotato. Note salvate: {n}.")
+
+    def leggi_note(self, _m):
+        n = extra.note()
+        if not n:
+            return risposta("Nessuna nota.")
+        return risposta(" ".join(f"{i}. {x['testo']}." for i, x in enumerate(n, 1)))
+
+    def non_disturbare(self, m):
+        ore = 1.0
+        if m["n"]:
+            n = extra._numero(m["n"])
+            if n is None or n <= 0:
+                return risposta(errore_utente("Durata non valida. Es. 'non disturbare per 2 ore'."), "errore_utente")
+            ore = n if m["u"].startswith("or") else n / 60
+        return self.s["non_disturbare"](ore)

@@ -276,7 +276,7 @@ function mostraSezione(nome) {
   $$('#menu button').forEach((x) => x.classList.toggle('attivo', x.dataset.sezione === nome));
   $$('.sezione').forEach((s) => s.classList.toggle('visibile', s.id === nome));
   if (nome === 'whatsapp') caricaChat();
-  if (nome === 'impostazioni') caricaImpostazioni();
+  if (nome === 'impostazioni') { caricaImpostazioni(); caricaRegistro(); }
   if (nome === 'gmail') caricaSpazio();
   if (nome === 'msi') aggiornaSistema();
 }
@@ -313,6 +313,7 @@ async function eseguiComando(testo) {
   try {
     const r = await api('/api/comando', { testo });
     gestisciRisposta(r);
+    aggiornaPromemoria();
   } catch (e) { parla(F.errore(e.message), true); }
 }
 
@@ -347,6 +348,7 @@ async function controllaAnnunci() {
     const r = await api('/api/annunci?dopo=' + (ultimoAnnuncio ?? 0));
     if (ultimoAnnuncio === null) { ultimoAnnuncio = r.ultimo; return; } // ignora quelli vecchi
     r.annunci.forEach((a) => { notifica(a.testo); gestisciRisposta({ ...a, esito: 'ok' }); });
+    if (r.annunci.length) aggiornaPromemoria();
     ultimoAnnuncio = r.ultimo;
   } catch { /* server non raggiungibile */ }
 }
@@ -398,6 +400,29 @@ async function aggiornaAgenda() {
     return ev;
   } catch (e) { $('#w-agenda').replaceChildren(el('span', { class: 'nota' }, e.message.slice(0, 120))); return null; }
 }
+
+async function aggiornaPromemoria() {
+  try {
+    const r = await api('/api/promemoria');
+    const righe = [
+      ...r.promemoria.map((p) => el('div', {}, el('strong', {}, dataOra(p.quando) + ' '), p.testo)),
+      ...r.note.map((n) => el('div', { class: 'sotto' }, '• ' + n.testo)),
+    ];
+    $('#w-promemoria').replaceChildren(...(righe.length ? righe
+      : [el('span', { class: 'nota' }, "Niente. Prova: 'ricordami tra 20 minuti di studiare' o 'annota comprare olio motore'.")]));
+  } catch { /* niente */ }
+}
+
+async function caricaRegistro() {
+  try {
+    const righe = await api('/api/registro');
+    $('#lista-registro').replaceChildren(...(righe.length ? righe.map((r) => el('div', { class: 'voce' + (r.dettaglio.includes('ERRATA') ? ' sicura' : '') },
+      el('div', { class: 'titolo' }, el('span', {}, r.tipo), el('span', { class: 'sotto' }, dataOra(r.ora))),
+      el('div', { class: 'sotto' }, r.dettaglio + (r.ip ? ` · ${r.ip}` : ''))))
+      : [el('p', { class: 'nota' }, 'Registro vuoto.')]));
+  } catch (e) { $('#lista-registro').replaceChildren(el('p', { class: 'errore' }, e.message)); }
+}
+$('#btn-registro').addEventListener('click', caricaRegistro);
 
 // =========================================================================
 // SEGRETERIA
@@ -484,6 +509,13 @@ async function rapporto(conSaluto = true) {
         if (t.messaggi.length) await api('/api/teams/visti', { ids: t.messaggi.map((m) => m.id) });
       }
     } catch { /* Teams non disponibile */ }
+
+    try {
+      const pr = await api('/api/promemoria');
+      const oggi = new Date().toDateString();
+      const diOggi = pr.promemoria.filter((p) => new Date(p.quando).toDateString() === oggi);
+      if (diOggi.length) parla('Promemoria di oggi: ' + diOggi.map((p) => `${dataOra(p.quando)} ${p.testo}`).join('; '));
+    } catch { /* niente */ }
 
     const ev = await aggiornaAgenda();
     if (ev) {
@@ -892,7 +924,7 @@ function preparaControlli() {
     history.replaceState(null, '', location.pathname + (document.body.classList.contains('compatto') ? '?modo=r1' : ''));
     await sequenzaAvvio();
   }
-  statoWa(); aggiornaMeteo(); aggiornaSistema(); aggiornaAgenda(); controllaAnnunci();
+  statoWa(); aggiornaMeteo(); aggiornaSistema(); aggiornaAgenda(); aggiornaPromemoria(); controllaAnnunci();
   if (attivazione) await rapporto(true); else aggiornaSegreteria(false);
   setInterval(() => { aggiornaSegreteria(true); statoWa(); aggiornaSistema(); }, 20000);
   setInterval(controllaAnnunci, 3000);
