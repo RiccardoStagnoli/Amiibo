@@ -28,6 +28,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+import chrome_controllo
+
 # ----------------------------- IMPOSTAZIONI -----------------------------
 # Indirizzo del PC server (vedi GUIDA, Fase 13), es. "http://192.168.1.20:8080"
 SERVER = "http://192.168.1.20:8080"
@@ -36,6 +38,9 @@ TOKEN = "cambia-questo-token"
 NOME = "Msi"
 # True = Jarvis puo' eseguire qualsiasi comando del Prompt su questo PC. Pericoloso.
 COMANDI_LIBERI = False
+# True = controllo completo di Chrome (schede, clic, lettura pagine...) tramite il
+# "Chrome di Jarvis" (profilo dedicato). Vedi GUIDA, Fase 21.
+CHROME_CONTROLLO = True
 # ------------------------------------------------------------------------
 
 SOGLIA = 0.90
@@ -78,6 +83,8 @@ def collegamenti_start():
 
 def apri_app(nome):
     n = nome.lower().strip()
+    if CHROME_CONTROLLO and n in ("chrome", "google chrome"):
+        return chrome_controllo.esegui("apri", {})
     if n in APP_NOTE:
         os.startfile(APP_NOTE[n]) if ":" in APP_NOTE[n] else subprocess.Popen(f'start "" {APP_NOTE[n]}', shell=True)
         return f"{nome} aperto su {NOME}."
@@ -95,6 +102,8 @@ def apri_app(nome):
 
 
 def apri_url(url, browser="chrome"):
+    if CHROME_CONTROLLO and browser == "chrome":
+        return chrome_controllo.esegui("vai", {"url": url, "nuova": True})
     if browser == "chrome":
         try:
             subprocess.Popen(f'start "" chrome "{url}"', shell=True)
@@ -106,6 +115,8 @@ def apri_url(url, browser="chrome"):
 
 
 def cerca(motore, testo):
+    if CHROME_CONTROLLO:
+        return chrome_controllo.esegui("cerca", {"testo": testo, "motore": motore})
     q = urllib.parse.quote_plus(testo)
     url = {"youtube": f"https://www.youtube.com/results?search_query={q}"}.get(
         motore, f"https://www.google.com/search?q={q}")
@@ -151,6 +162,10 @@ def esegui(azione, p):
         return steam_scarica(p["gioco"])
     if azione == "screenshot":
         return screenshot()
+    if azione == "chrome":
+        if not CHROME_CONTROLLO:
+            return "Controllo di Chrome disattivato sul PC Msi (CHROME_CONTROLLO = False)."
+        return chrome_controllo.esegui(p.get("op", ""), p)
     if azione == "blocca":
         ctypes.windll.user32.LockWorkStation()
         return f"{NOME} bloccato."

@@ -108,6 +108,13 @@ Spunta ogni riga quando l'hai fatta.
   - in `config.py` imposta `ACCESSO_REMOTO = True`, la password e `INDIRIZZO_TELEFONO`;
   - inquadra il QR in Impostazioni → "App per telefono" e installa l'app.
 
+## E4. Chrome sul Msi (Fase 21)
+
+- [ ] **26h.** Sul Msi:
+  - aggiorna la cartella `C:\JarvisMsi` con la nuova cartella `msi`, tenendo `SERVER` e `TOKEN` in `msi_agente.py`;
+  - esegui `installa_msi.bat`, poi `avvia_msi.bat`.
+- [ ] **26i.** Di' o scrivi `apri chrome`, poi nella nuova finestra accedi a Google e attiva la sincronizzazione.
+
 ## F. Telefono Vodafone (non automatizzabile gratis)
 
 - [ ] **27.** Facoltativo: chiama il **42020** e registra il saluto della segreteria: *"Riccardo non è al momento raggiungibile..."*.

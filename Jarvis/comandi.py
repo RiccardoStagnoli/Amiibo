@@ -29,6 +29,8 @@ def risposta(testo, esito="ok", **extra):
 
 AIUTO = (
     "Comandi: 'apri chrome e cerca ...', 'cerca su youtube ...', 'apri steam e scarica ...', "
+    "Chrome: 'nuova scheda ...', 'schede', 'passa alla scheda ...', 'chiudi scheda', 'indietro', 'leggi la pagina', "
+    "'clicca su ...', 'digita ...', 'premi invio', 'scorri giu', 'pausa', 'screenshot chrome', "
     "'apri <programma>', 'screenshot msi', 'blocca msi', 'spegni msi', 'leggi messaggi', "
     "'scrivi a <nome>: <testo>', 'leggi la posta', 'pulisci la posta', 'spazio account', "
     "'agenda', 'aggiungi al calendario: ...', 'cerca su drive ...', 'leggi teams', 'meteo', "
@@ -160,6 +162,30 @@ class Interprete:
             (r"^(domanda|chiedi|cerca nei documenti)[:,]? (?P<q>.+)$", lambda m: self.chiedi(m["q"])),
             # --- Meccanica ---
             (r"^meccanica[:,]? ?(?P<q>.*)$", self.meccanica),
+            # --- Chrome (controllo completo, sul PC Msi) ---
+            (r"^(apri )?(una )?nuova scheda( (con|su))? ?(?P<u>.*)$", lambda m: self.chrome("vai", url=(m["u"].strip() or "www.google.com"), nuova=True)),
+            (r"^(quali )?schede( aperte)?$|^che schede (ho|sono) apert[ei]$", lambda m: self.chrome("schede")),
+            (r"^(passa|vai|torna) (alla|sulla|nella) scheda (?P<n>.+)$", lambda m: self.chrome("passa", nome=m["n"].strip())),
+            (r"^chiudi tutte le schede$", lambda m: self.chrome("chiudi_tutte")),
+            (r"^chiudi (la |questa )?scheda( (?P<n>.+))?$", lambda m: self.chrome("chiudi", nome=(m["n"] or "").strip() or None)),
+            (r"^(torna )?indietro$|^pagina precedente$", lambda m: self.chrome("indietro")),
+            (r"^(vai )?avanti$|^pagina successiva$", lambda m: self.chrome("avanti")),
+            (r"^ricarica( la pagina)?$|^aggiorna la pagina$", lambda m: self.chrome("ricarica")),
+            (r"^scorri (in )?giu$|^vai giu$", lambda m: self.chrome("scorri", direzione="giu")),
+            (r"^scorri (in )?su$|^vai su$", lambda m: self.chrome("scorri", direzione="su")),
+            (r"^vai (in fondo|alla fine)( della pagina)?$", lambda m: self.chrome("scorri", direzione="fine")),
+            (r"^(vai |torna )?(all'inizio|in cima)( della pagina)?$", lambda m: self.chrome("scorri", direzione="inizio")),
+            (r"^leggi (la pagina|la scheda|questa pagina|cosa c'e scritto)$", lambda m: self.chrome("leggi")),
+            (r"^premi invio$", lambda m: self.chrome("invio")),
+            (r"^(clicca|premi|cliccare|tocca)( su)? (?P<t>.+)$", self.chrome_clicca),
+            (r"^(digita|scrivi nella pagina|scrivi qui|scrivi nel campo)[:,]? (?P<t>.+?)(?P<invio> e premi invio)?$", self.chrome_digita),
+            (r"^(metti in )?pausa( il video)?$|^ferma il video$", lambda m: self.chrome("video", azione="pausa")),
+            (r"^(riproduci|fai partire|play|riprendi)( il video)?$", lambda m: self.chrome("video", azione="riproduci")),
+            (r"^(muto|togli l'audio|metti l'audio|togli il muto)$", lambda m: self.chrome("video", azione="muto")),
+            (r"^(video )?a schermo intero$", lambda m: self.chrome("video", azione="schermo intero")),
+            (r"^screenshot (di |del )?chrome$", lambda m: self.chrome("screenshot")),
+            (r"^cerca su google (?P<q>.+)$", lambda m: self.msi_cerca("google", m["q"])),
+            (r"^cerca (?P<q>.+) su google$", lambda m: self.msi_cerca("google", m["q"])),
             # --- apri programma (va per ultimo tra le regole "apri") ---
             (r"^(apri|avvia) (?P<a>.+?)( su (msi|pc))?$", lambda m: self.msi_app(m["a"])),
         ]
@@ -393,3 +419,19 @@ class Interprete:
             return risposta(incerto(f"Nessuna foto o video con una descrizione che corrisponda al 90% a '{m['q'].strip()}'."), "incerto")
         return risposta(f"Trovati {len(trovati)}: " + "; ".join(x["descrizione"] for x in trovati[:5]) + ".",
                         azione_pannello="media", media=[x["id"] for x in trovati])
+
+    # ------------------------------ Chrome ------------------------------
+    def chrome(self, op, **parametri):
+        return self.msi("chrome", {"op": op, **{k: v for k, v in parametri.items() if v is not None}})
+
+    def chrome_clicca(self, m):
+        testo = m["t"].strip(" '\"")
+        if testo in ("invio", "enter"):
+            return self.chrome("invio")
+        return self.chrome("clicca", testo=testo)
+
+    def chrome_digita(self, m):
+        testo = m["t"].strip()
+        if not testo:
+            return risposta(errore_utente("Digitare cosa?"), "errore_utente")
+        return self.chrome("digita", testo=testo, invio=bool(m["invio"]))

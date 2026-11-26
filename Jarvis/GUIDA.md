@@ -408,6 +408,43 @@ Jarvis si installa sul telefono come un'**app** (icona nella schermata Home, ape
 
 Con il server spento, l'app mostra *"Server non raggiungibile"* con il pulsante **Riprova**.
 
+## Fase 21 – Controllo completo di Chrome (PC Msi)
+
+Jarvis controlla Chrome sul Msi: apre e chiude schede, naviga, legge le pagine, clicca pulsanti e link, scrive nei campi, scorre, mette in pausa i video e mostra lo schermo di Chrome.
+
+**Come funziona.** Usa il Chrome DevTools Protocol, lo stesso degli strumenti di automazione. Da Chrome 136 Google **non permette** questo controllo sul profilo normale di Chrome. Jarvis apre quindi il **"Chrome di Jarvis"**, un profilo separato (cartella `C:\JarvisMsi\chrome_jarvis`).
+
+**Preparazione (una volta):**
+1. Sul Msi esegui di nuovo `installa_msi.bat` (aggiunge la libreria `websocket-client`).
+2. Riavvia `avvia_msi.bat`.
+3. Dal pannello o a voce: `apri chrome`. Si apre una finestra di Chrome nuova.
+4. In quella finestra accedi con il tuo **account Google** e attiva la **sincronizzazione**: arrivano segnalibri, password salvate, cronologia ed estensioni. Da quel momento Jarvis lavora con i tuoi siti già loggati.
+5. Usa quella finestra come Chrome principale sul Msi (puoi fissarla sulla barra delle applicazioni).
+
+**Comandi** (barra in alto, Mic, o pulsanti nella sezione Msi):
+
+| Comando | Cosa fa |
+|---|---|
+| `apri chrome` | Apre il Chrome di Jarvis |
+| `apri chrome e cerca ...` / `cerca su google ...` / `cerca su youtube ...` | Ricerca in una nuova scheda |
+| `nuova scheda youtube.com` / `apri youtube.com` | Apre un sito |
+| `schede` | Elenca le schede aperte |
+| `passa alla scheda gmail` / `chiudi scheda` / `chiudi la scheda youtube` / `chiudi tutte le schede` | Gestione schede |
+| `indietro` / `avanti` / `ricarica la pagina` | Navigazione |
+| `scorri giù` / `scorri su` / `vai in fondo` / `vai in cima` | Scorrimento |
+| `leggi la pagina` | Ti legge il testo della pagina (a voce se l'hai chiesto a voce) |
+| `clicca su iscriviti` | Clicca il pulsante o link con quel testo |
+| `digita motori a scoppio e premi invio` / `premi invio` | Scrive nel campo selezionato (o nel primo campo di testo) |
+| `pausa` / `riproduci` / `muto` / `a schermo intero` | Video (YouTube e simili) |
+| `screenshot chrome` | Mostra nel pannello cosa c'è nella scheda |
+
+**Regola del 90%:** se nessun pulsante o scheda corrisponde almeno al 90% a quello che hai detto, Jarvis non clicca nulla e ti elenca i nomi simili.
+
+**Sicurezza:**
+- La porta di controllo di Chrome (9222) è aperta solo sul PC Msi stesso (127.0.0.1), non in rete.
+- Qualsiasi programma installato sul Msi però potrebbe usarla mentre il Chrome di Jarvis è aperto: non installare programmi di dubbia provenienza.
+- Per disattivare il controllo: `CHROME_CONTROLLO = False` in `msi_agente.py`.
+
 ## Il manuale di meccanica
 
 - **Titolo:** *La Vettura Automobile – Sue parti, suo funzionamento*
