@@ -54,6 +54,7 @@
   <button data-sezione="msi">Msi</button>
   <button data-sezione="github">GitHub</button>
   <button data-sezione="meccanica">Meccanica</button>
+  <button data-sezione="scrittura">Scrittura</button>
   <button data-sezione="media">Media</button>
   <button data-sezione="memoria">Memoria</button>
   <button data-sezione="impostazioni">Impostazioni</button>
@@ -250,6 +251,39 @@
           <input id="gh-issue-titolo" class="campo" placeholder="titolo" autocomplete="off">
           <button class="btn" type="submit">Crea</button>
         </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- SCRITTURA A MANO -->
+  <section id="scrittura" class="sezione">
+    <div class="pannello">
+      <h2>Scrittura a mano</h2>
+      <p class="nota">Scrivi col dito o col mouse, oppure carica/scatta una foto di un foglio. Jarvis riconosce lettera per lettera; le parole su cui ha dubbi (sotto il 90%) te le chiede, e ogni correzione gli insegna la tua calligrafia. Funziona meglio con lettere staccate; solo lettere e numeri.</p>
+      <canvas id="lavagna" class="lavagna" width="1200" height="420"></canvas>
+      <div class="azioni">
+        <button class="btn" id="btn-riconosci">Riconosci</button>
+        <button class="btn sec" id="btn-cancella-lavagna">Cancella</button>
+        <label class="btn sec" for="foto-scritta">Foto di un foglio</label>
+        <input id="foto-scritta" type="file" accept="image/*" capture="environment" hidden>
+        <button class="btn sec" id="btn-modo-allena">Allenamento</button>
+      </div>
+      <div id="allena-zona" class="nota" hidden>
+        <p>Scrivi più volte (staccate) la lettera: <strong id="lettera-da-allenare" class="lettera-grande">a</strong></p>
+        <div class="azioni">
+          <button class="btn" id="btn-salva-lettera">Salva e passa alla prossima</button>
+          <button class="btn sec" id="btn-salta-lettera">Salta</button>
+        </div>
+      </div>
+      <div id="stato-scrittura" class="nota"></div>
+    </div>
+    <div class="pannello" id="risultato-scrittura-zona" hidden>
+      <h2>Ho letto</h2>
+      <div id="risultato-scrittura" class="parole-lette"></div>
+      <div class="azioni">
+        <button class="btn" id="btn-conferma-scrittura">Conferma e impara</button>
+        <button class="btn sec" id="btn-usa-comando">Esegui come comando</button>
+        <button class="btn sec" id="btn-copia-testo">Copia testo</button>
       </div>
     </div>
   </section>

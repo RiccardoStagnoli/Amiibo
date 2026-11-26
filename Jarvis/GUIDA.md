@@ -470,6 +470,61 @@ Jarvis usa l'API ufficiale di GitHub con un **token personale** che crei tu. Il 
 
 Il rapporto all'attivazione e il riepilogo quotidiano includono le notifiche GitHub non lette. Ogni operazione su GitHub finisce nel **Registro attività**.
 
+## Fase 23 – Esercizi di matematica, meccanica e tecnologia
+
+Jarvis risolve gli esercizi con **calcoli esatti** (libreria SymPy, gratuita): non "indovina" come un'intelligenza artificiale generica. Se un dato è ambiguo o l'esercizio non è riconosciuto, lo dice invece di dare un risultato sbagliato. Mostra sempre i **passaggi**.
+
+**Matematica** (scrivi o detta):
+- `risolvi x^2 - 5x + 6 = 0` (mostra Δ e le soluzioni) · `risolvi 2x + 3 = 11` · sistemi: `risolvi x + y = 5; x - y = 1`
+- `deriva x^3*sin(x)` · `integra x^2 da 0 a 3` · `integra 1/x` · `limite di sin(x)/x per x che tende a 0`
+- `scomponi x^2 - 9` · `espandi (x+1)^3` · `semplifica ...` · `calcola 3/4 + 2^5 * sqrt(2)`
+- Si possono usare `sen`, `tg`, `radice di`, `π`, `²`, la virgola decimale.
+
+**Fisica, meccanica, elettrotecnica, tecnologia**: scrivi l'esercizio come sul libro, con i dati e le unità di misura. Esempi provati:
+- "Un'auto parte da ferma e accelera a 2 m/s² per 10 s. Che velocità raggiunge?" → 20 m/s
+- "Un'auto a 72 km/h frena fino a fermarsi in 4 s. Calcola l'accelerazione." → -5 m/s²
+- "Una lampadina da 60 W è alimentata a 230 V. Quale corrente assorbe?" → 0,26 A
+- "Due resistenze da 10 ohm e 20 ohm in parallelo. Calcola la resistenza equivalente." → 6,67 Ω
+- "Una ruota dentata motrice da 20 denti gira a 1500 giri/min ... ruota condotta da 60 denti. Quanti giri fa la ruota condotta?" → 500 giri/min
+- "Un motore eroga una coppia di 50 Nm a 3000 giri/min. Calcola la potenza." → 15708 W
+- Forma rapida: `m=10 kg, a=3 m/s^2, F=?`
+- Conversioni: `converti 120 km/h in m/s`
+
+Argomenti coperti: moto uniforme e accelerato, caduta libera, dinamica, lavoro/energia/potenza/rendimento, moto circolare, leve e momenti, trasmissioni a ingranaggi, pressione e fluidi, legge di Ohm, potenza ed energia elettrica, resistenze in serie e in parallelo, calorimetria. Jarvis concatena più formule quando serve (es. coppia + giri → frequenza → velocità angolare → potenza).
+
+**Limiti:**
+- se due dati hanno la stessa unità e non dici quale è quale (es. due velocità senza "iniziale/finale"), te lo chiede;
+- esercizi fuori da questi argomenti, o con figure e grafici, non li risolve: risponde "Dati insufficienti per verificare".
+
+## Fase 24 – Riconoscimento della scrittura a mano
+
+Sezione **Scrittura** del pannello: scrivi col dito o col mouse sulla lavagna, oppure carica/scatta la **foto di un foglio**, poi **Riconosci**.
+
+**Come funziona:**
+1. divide l'immagine in righe, parole e **lettere**;
+2. riconosce ogni lettera confrontando la forma, la direzione dei tratti, quanto sale e scende rispetto alla riga (è ciò che distingue l da i, d da a, p da o) e la presenza del puntino o degli accenti;
+3. se due lettere si toccano, prova i punti di taglio possibili e sceglie la divisione più sicura;
+4. ogni parola ha una **certezza**: sotto il 90% prova a correggerla con le parole che conosce. Se resta in dubbio, la evidenzia in arancione e **te la chiede**;
+5. quando premi **Conferma e impara**, ogni lettera diventa un nuovo esempio della **tua** calligrafia. Funziona anche se le lettere erano attaccate: Jarvis trova i tagli che corrispondono alla parola giusta. I pattern che si ripetono vengono riconosciuti sempre meglio.
+
+**Per iniziare bene:**
+- **Allenamento**: Jarvis ti mostra una lettera alla volta (a–z, 0–9). Scrivila 3–5 volte staccata sulla lavagna e premi **Salva e passa alla prossima**. Bastano 10 minuti per un grosso miglioramento.
+- All'inizio Jarvis usa esempi creati dai caratteri "scritti a mano" di Windows (Ink Free, Segoe Print, Comic Sans).
+
+**Risultati delle mie prove** (su caratteri diversi da quelli di partenza, usati come "calligrafia sconosciuta"):
+- lettere staccate, tratto normale: dal 51–98% di lettere giuste;
+- dopo **3 sole correzioni**, nella maggior parte delle prove si sale fino al 90–96%.
+- **Lettere molto spesse e fuse tra loro** (corsivo tutto attaccato): resta debole (20–58%) e chiede spesso.
+
+Una calligrafia vera **non l'ho potuta provare**.
+
+**Limiti:**
+- riconosce solo lettere e numeri (non simboli come + = ^);
+- foto storte o scure peggiorano il risultato;
+- scrivi su sfondo chiaro e uniforme.
+
+Il pulsante **Esegui come comando** manda il testo letto a Jarvis, come se lo avessi scritto nella barra.
+
 ## Il manuale di meccanica
 
 - **Titolo:** *La Vettura Automobile – Sue parti, suo funzionamento*

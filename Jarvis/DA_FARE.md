@@ -120,6 +120,12 @@ Spunta ogni riga quando l'hai fatta.
 - [ ] **26l.** Crea un token su GitHub (Fine-grained, permessi indicati nella guida).
 - [ ] **26m.** Incollalo nel pannello: sezione GitHub → Collega.
 
+## E6. Esercizi e scrittura a mano (Fasi 23–24)
+
+- [ ] **26n.** Esegui di nuovo `installa.bat`: aggiunge SymPy, NumPy e Pillow.
+- [ ] **26o.** Sezione **Scrittura** → **Allenamento**: scrivi ogni lettera 3–5 volte (circa 10 minuti).
+- [ ] **26p.** Quando Jarvis evidenzia una parola in arancione, correggila e premi **Conferma e impara**.
+
 ## F. Telefono Vodafone (non automatizzabile gratis)
 
 - [ ] **27.** Facoltativo: chiama il **42020** e registra il saluto della segreteria: *"Riccardo non è al momento raggiungibile..."*.

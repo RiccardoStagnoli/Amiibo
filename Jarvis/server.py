@@ -767,6 +767,64 @@ def api_media_invia():
     return jsonify(r)
 
 
+# ============================ SCRITTURA A MANO ============================
+def _immagine_richiesta():
+    f = request.files.get("file")
+    if f and f.filename:
+        return f.read()
+    return (request.get_json(silent=True) or {}).get("immagine") or ""
+
+
+@app.route("/api/scrittura/riconosci", methods=["POST"])
+@richiede_accesso
+def api_scrittura_riconosci():
+    import scrittura
+
+    dati = _immagine_richiesta()
+    if not dati:
+        return jsonify(errore=errore_utente("Non hai scritto niente.")), 400
+    try:
+        return jsonify(scrittura.riconosci(dati))
+    except ValueError as e:
+        return jsonify(errore=str(e)), 400
+    except Exception as e:
+        return jsonify(errore=f"Immagine non leggibile: {e}"), 400
+
+
+@app.route("/api/scrittura/correggi", methods=["POST"])
+@richiede_accesso
+def api_scrittura_correggi():
+    import scrittura
+
+    d = request.get_json(silent=True) or {}
+    try:
+        r = scrittura.correggi(str(d.get("sessione", "")), d.get("correzioni") or {})
+    except ValueError as e:
+        return jsonify(errore=str(e)), 400
+    extra.registra("scrittura", f"imparate {r['lettere_imparate']} lettere", request.remote_addr)
+    return jsonify(r)
+
+
+@app.route("/api/scrittura/allena", methods=["POST"])
+@richiede_accesso
+def api_scrittura_allena():
+    import scrittura
+
+    d = request.get_json(silent=True) or {}
+    try:
+        return jsonify(scrittura.allena(d.get("immagine") or "", str(d.get("lettera", ""))))
+    except ValueError as e:
+        return jsonify(errore=str(e)), 400
+
+
+@app.route("/api/scrittura/stato")
+@richiede_accesso
+def api_scrittura_stato():
+    import scrittura
+
+    return jsonify(scrittura.stato())
+
+
 # ================================ GITHUB ================================
 def _gh(funzione):
     import github_jarvis

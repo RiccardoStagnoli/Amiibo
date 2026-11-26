@@ -328,6 +328,7 @@ function mostraSezione(nome) {
   if (nome === 'memoria') caricaMemoria();
   if (nome === 'media') caricaMedia();
   if (nome === 'github') caricaGitHub();
+  if (nome === 'scrittura') { preparaLavagna(); statoScrittura(); }
 }
 
 setInterval(() => { $('#orologio').textContent = new Date().toLocaleTimeString('it-IT'); }, 1000);
@@ -356,6 +357,7 @@ function gestisciRisposta(r, voce = false) {
   if (r.immagine) { $('#msi-schermo').src = r.immagine; $('#msi-schermo').hidden = false; mostraSezione('msi'); }
   if (r.azione_pannello === 'rapporto') rapporto(false);
   if (r.azione_pannello === 'pulizia') { mostraSezione('gmail'); analizzaPosta(); }
+  if (r.azione_pannello === 'scrittura') mostraSezione('scrittura');
   if (r.azione_pannello === 'media') { mostraSezione('media'); evidenziaMedia(r.media || []); }
   if (r.fonti && r.fonti.length) mostraParlato(r.testo + '\nFonti: ' + r.fonti.map((f) => `${f.manuale} (${f.sezione})`).join(', '));
 }
@@ -983,6 +985,116 @@ $('#form-documento').addEventListener('submit', async (e) => {
     caricaMemoria();
   } catch (err) { scrivi(err.message, true); suono('errore'); }
 });
+
+// =========================================================================
+// SCRITTURA A MANO
+// =========================================================================
+let lavagnaPronta = false;
+let sessioneScrittura = null;
+let modoAllena = false;
+const DA_ALLENARE = 'abcdefghijklmnopqrstuvwxyz0123456789'.split('');
+let indiceAllena = 0;
+
+function pulisciLavagna() {
+  const c = $('#lavagna'); const ctx = c.getContext('2d');
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, c.width, c.height);
+}
+
+function preparaLavagna() {
+  if (lavagnaPronta) return;
+  lavagnaPronta = true;
+  const c = $('#lavagna'); const ctx = c.getContext('2d');
+  pulisciLavagna();
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#101418'; ctx.lineWidth = 9;
+  let disegna = false;
+  const punto = (e) => { const r = c.getBoundingClientRect(); return [(e.clientX - r.left) * c.width / r.width, (e.clientY - r.top) * c.height / r.height]; };
+  c.addEventListener('pointerdown', (e) => {
+    disegna = true; c.setPointerCapture(e.pointerId);
+    const [x, y] = punto(e); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 0.1, y + 0.1); ctx.stroke();
+  });
+  c.addEventListener('pointermove', (e) => { if (!disegna) return; const [x, y] = punto(e); ctx.lineTo(x, y); ctx.stroke(); });
+  const fine = () => { disegna = false; };
+  c.addEventListener('pointerup', fine); c.addEventListener('pointercancel', fine);
+}
+
+async function statoScrittura() {
+  try {
+    const s = await api('/api/scrittura/stato');
+    $('#stato-scrittura').textContent = `Esempi imparati dalla tua calligrafia: ${s.tuoi} (su ${s.totale} totali) · parole confermate: ${s.parole_imparate}.`;
+  } catch (e) { $('#stato-scrittura').textContent = e.message; }
+}
+
+function mostraLettura(r) {
+  sessioneScrittura = r.sessione;
+  const elementi = [];
+  r.righe.forEach((riga, i) => {
+    if (i) elementi.push(el('div', { class: 'a-capo' }));
+    riga.forEach((p) => {
+      elementi.push(el('div', { class: 'parola-letta' + (p.dubbio ? ' dubbio' : '') },
+        el('input', { class: 'campo', value: p.testo, 'data-id': p.id, autocomplete: 'off', list: 'alt-' + p.id }),
+        el('datalist', { id: 'alt-' + p.id }, ...p.alternative.map((a) => el('option', { value: a }))),
+        el('span', { class: 'sotto' }, `${Math.round(p.certezza * 100)}%` + (p.dubbio ? ' · non sono sicuro: correggi se serve' : ''))));
+    });
+  });
+  $('#risultato-scrittura').replaceChildren(...elementi);
+  $('#risultato-scrittura-zona').hidden = false;
+  const letto = r.testo.replace(/\n/g, ' ');
+  if (r.dubbi) scrivi(`Ho letto: "${letto}". Non sono sicuro di ${r.dubbi} parol${r.dubbi === 1 ? 'a' : 'e'}: correggi e premi "Conferma e impara".`);
+  else scrivi(`Ho letto: "${letto}".`);
+}
+
+async function riconosciImmagine(immagine, file) {
+  try {
+    let r;
+    if (file) {
+      const dati = new FormData(); dati.append('file', file);
+      const risposta = await fetch('/api/scrittura/riconosci', { method: 'POST', body: dati });
+      r = await risposta.json();
+      if (!risposta.ok) throw new Error(r.errore || 'Errore');
+    } else {
+      r = await api('/api/scrittura/riconosci', { immagine });
+    }
+    mostraLettura(r);
+  } catch (e) { scrivi(e.message, true); suono('errore'); }
+}
+
+$('#btn-riconosci').addEventListener('click', () => { preparaLavagna(); riconosciImmagine($('#lavagna').toDataURL('image/png')); });
+$('#btn-cancella-lavagna').addEventListener('click', pulisciLavagna);
+$('#foto-scritta').addEventListener('change', (e) => { if (e.target.files[0]) riconosciImmagine(null, e.target.files[0]); e.target.value = ''; });
+
+function testoLetto() {
+  return $$('#risultato-scrittura input').map((i) => i.value.trim()).filter(Boolean).join(' ');
+}
+$('#btn-conferma-scrittura').addEventListener('click', async () => {
+  if (!sessioneScrittura) return;
+  const correzioni = Object.fromEntries($$('#risultato-scrittura input').map((i) => [i.dataset.id, i.value.trim()]));
+  try {
+    const r = await api('/api/scrittura/correggi', { sessione: sessioneScrittura, correzioni });
+    scrivi(`Imparato: ${r.lettere_imparate} lettere da ${r.parole_imparate} parole` + (r.solo_vocabolario ? `, ${r.solo_vocabolario} parole solo nel vocabolario.` : '.'));
+    statoScrittura();
+  } catch (e) { scrivi(e.message, true); }
+});
+$('#btn-usa-comando').addEventListener('click', () => { const t = testoLetto(); if (t) eseguiComando(t); });
+$('#btn-copia-testo').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(testoLetto()); scrivi('Testo copiato.'); } catch { scrivi('Copia non permessa da questo browser.', true); }
+});
+
+function aggiornaAllena() { $('#lettera-da-allenare').textContent = DA_ALLENARE[indiceAllena % DA_ALLENARE.length]; }
+$('#btn-modo-allena').addEventListener('click', () => {
+  modoAllena = !modoAllena;
+  $('#allena-zona').hidden = !modoAllena;
+  $('#btn-modo-allena').textContent = modoAllena ? 'Fine allenamento' : 'Allenamento';
+  preparaLavagna(); pulisciLavagna(); aggiornaAllena();
+});
+$('#btn-salva-lettera').addEventListener('click', async () => {
+  try {
+    const lettera = DA_ALLENARE[indiceAllena % DA_ALLENARE.length];
+    const r = await api('/api/scrittura/allena', { immagine: $('#lavagna').toDataURL('image/png'), lettera });
+    scrivi(`"${lettera}": ${r.aggiunti} esempi salvati.`);
+    indiceAllena += 1; pulisciLavagna(); aggiornaAllena(); statoScrittura();
+  } catch (e) { scrivi(e.message, true); suono('errore'); }
+});
+$('#btn-salta-lettera').addEventListener('click', () => { indiceAllena += 1; pulisciLavagna(); aggiornaAllena(); });
 
 // =========================================================================
 // GITHUB

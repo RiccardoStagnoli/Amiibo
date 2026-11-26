@@ -161,6 +161,9 @@ class Interprete:
             # --- Esercizi (matematica, fisica, meccanica, tecnologia) ---
             (r"^(esercizio|problema|risolvi l'esercizio)[:,]? (?P<q>.+)$", lambda m: self.esercizio(m["q"])),
             (r"^(?P<q>(risolvi|equazione|sistema|deriva|derivata|integra|integrale|limite|semplifica|scomponi|espandi|converti|calcola)\b.+)$", lambda m: self.esercizio(m["q"])),
+            # --- Scrittura a mano ---
+            (r"^(riconosci|leggi) (la )?(scrittura|calligrafia|quello che scrivo|il mio scritto)$|^scrittura a mano$",
+             lambda m: risposta("Scrivi sulla lavagna della sezione Scrittura.", azione_pannello="scrittura")),
             # --- Foto e video ---
             (r"^(mostra(mi)?|fammi vedere|trova|apri) (la |il |le |i |una |un )?(foto|video|immagine|immagini)( (di|della|del|dello|delle|dei|degli|con|sul|sulla))? (?P<q>.+)$", self.mostra_media),
             (r"^(mostra(mi)?|apri) (le |i )?(mie )?(foto|video|galleria)$", lambda m: risposta("Galleria aperta.", azione_pannello="media")),
