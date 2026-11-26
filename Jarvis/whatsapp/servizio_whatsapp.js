@@ -19,7 +19,7 @@ const http = require('http');
 const path = require('path');
 const QRCode = require('qrcode');
 const qrcodeTerminal = require('qrcode-terminal');
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 
 // ----------------------------- IMPOSTAZIONI -----------------------------
 const PORTA = 3010;
@@ -366,6 +366,17 @@ const rotte = {
   },
 
   // Messaggio a se stessi (chat "Tu" di WhatsApp): usato per promemoria e riepilogo.
+  // Foto/video della galleria di Jarvis (cartella dati/media) inviati in una chat.
+  'POST /invia_media': async (b) => {
+    if (!b.chat || !/^\d+\.[a-z0-9]+$/.test(b.file || '')) throw new Error('Servono chat e file validi');
+    const percorso = path.join(CARTELLA_DATI, 'media', b.file);
+    if (!fs.existsSync(percorso)) throw new Error('File non trovato');
+    const media = MessageMedia.fromFilePath(percorso);
+    const grande = fs.statSync(percorso).size > 16 * 1024 * 1024; // oltre 16 MB: come documento
+    await client.sendMessage(b.chat, media, { caption: b.didascalia || '', sendMediaAsDocument: grande });
+    return { ok: true, come_documento: grande };
+  },
+
   'POST /invia_a_me': async (b) => {
     if (!b.testo) throw new Error('Testo mancante');
     await client.sendMessage(client.info.wid._serialized, String(b.testo));

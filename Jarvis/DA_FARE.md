@@ -97,6 +97,17 @@ Spunta ogni riga quando l'hai fatta.
 - [ ] **26c.** Ogni settimana controlla *"Comandi e domande che non ho capito"* e premi **Insegna**.
 - [ ] **26d.** Fai ogni tanto una copia della cartella `C:\Jarvis\dati`.
 
+## E3. Voce, foto/video e app sul telefono (Fasi 18–20)
+
+- [ ] **26e.** Esegui di nuovo `installa.bat`: aggiunge la voce Piper e il generatore di QR.
+  - Al primo avvio il server scarica la voce (28 MB).
+  - Se Piper dà errore all'avvio, installa il "Microsoft Visual C++ Redistributable" (x64) dal sito Microsoft. *Dati insufficienti per verificare se serve su ogni PC.*
+- [ ] **26f.** In `config.py` scegli `VOCE_PIPER` ed `EFFETTO_VOCE`, poi prova la voce in Impostazioni → Voce → "Prova voce".
+- [ ] **26g.** Telefono:
+  - esegui `tailscale serve --bg 8080`;
+  - in `config.py` imposta `ACCESSO_REMOTO = True`, la password e `INDIRIZZO_TELEFONO`;
+  - inquadra il QR in Impostazioni → "App per telefono" e installa l'app.
+
 ## F. Telefono Vodafone (non automatizzabile gratis)
 
 - [ ] **27.** Facoltativo: chiama il **42020** e registra il saluto della segreteria: *"Riccardo non è al momento raggiungibile..."*.

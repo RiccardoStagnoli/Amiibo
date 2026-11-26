@@ -31,7 +31,7 @@ CARTELLA = os.path.dirname(os.path.abspath(__file__))
 CARTELLA_WEB = os.path.join(CARTELLA, "web")
 CARTELLA_DATI = os.path.join(CARTELLA, "dati")
 API_WHATSAPP = "http://127.0.0.1:3010"
-FILE_WEB = ("style.css", "app.js", "manifest.json", "icona.svg")
+FILE_WEB = ("style.css", "app.js", "manifest.json", "icona.svg", "icona-192.png", "icona-512.png")
 
 os.makedirs(CARTELLA_DATI, exist_ok=True)
 
@@ -123,6 +123,15 @@ def risorse(nome):
     if nome not in FILE_WEB:
         abort(404)
     return send_from_directory(CARTELLA_WEB, nome)
+
+
+@app.route("/sw.js")
+def service_worker():
+    """Service worker dell'app per telefono: deve stare nella radice del sito."""
+    r = send_from_directory(CARTELLA_WEB, "sw.js")
+    r.headers["Cache-Control"] = "no-cache"
+    r.headers["Service-Worker-Allowed"] = "/"
+    return r
 
 
 @app.route("/vocali/<nome>")
@@ -597,7 +606,7 @@ def pianificatore():
 
 
 # ================================ MEMORIA ================================
-app.config["MAX_CONTENT_LENGTH"] = (memoria.MAX_MB + 1) * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 210 * 1024 * 1024  # video fino a 200 MB
 
 
 @app.route("/api/memoria")
@@ -668,6 +677,117 @@ def api_memoria_elimina():
     return jsonify(ok=True)
 
 
+# ================================= VOCE =================================
+@app.route("/api/voce", methods=["POST"])
+@richiede_accesso
+def api_voce():
+    """Audio WAV con la voce di Jarvis (Piper), riprodotto dal browser di qualsiasi dispositivo."""
+    import io
+
+    import voce_jarvis
+
+    testo = ((request.get_json(silent=True) or {}).get("testo") or "").strip()
+    if not testo:
+        return jsonify(errore="Testo vuoto"), 400
+    try:
+        dati = voce_jarvis.sintetizza(testo)
+    except Exception as e:
+        return jsonify(errore=f"Voce di Jarvis non disponibile: {e}"), 503
+    from flask import send_file
+
+    return send_file(io.BytesIO(dati), mimetype="audio/wav", max_age=86400)
+
+
+# ============================== FOTO E VIDEO ==============================
+@app.route("/media/<file>")
+@richiede_accesso
+def file_media(file):
+    import media
+
+    try:
+        p = media.percorso(file)
+    except ValueError:
+        abort(404)
+    return send_from_directory(os.path.dirname(p), os.path.basename(p), conditional=True)
+
+
+@app.route("/api/media", methods=["GET", "POST"])
+@richiede_accesso
+def api_media():
+    import media
+
+    if request.method == "GET":
+        return jsonify(media.elenco())
+    f = request.files.get("file")
+    descrizione = (request.form.get("descrizione") or "").strip()
+    if not f or not f.filename:
+        return jsonify(errore=errore_utente("Non hai scelto nessuna foto o video.")), 400
+    if len(descrizione.split()) < 2:
+        return jsonify(errore=errore_utente("Scrivi una descrizione di almeno due parole, o non la ritroverai mai.")), 400
+    try:
+        m = media.aggiungi(f.filename, f.stream, descrizione)
+    except ValueError as e:
+        return jsonify(errore=str(e)), 400
+    extra.registra("media", f"{m['tipo']}: {descrizione}", request.remote_addr)
+    return jsonify(m)
+
+
+@app.route("/api/media/elimina", methods=["POST"])
+@richiede_accesso
+def api_media_elimina():
+    import media
+
+    m = media.elimina(str((request.get_json(silent=True) or {}).get("id", "")))
+    return jsonify(ok=bool(m))
+
+
+@app.route("/api/media/invia", methods=["POST"])
+@richiede_accesso
+def api_media_invia():
+    import media
+
+    d = request.get_json(silent=True) or {}
+    m = media.trova(str(d.get("id", "")))
+    if not m:
+        return jsonify(errore="Foto o video non trovato."), 404
+    if not d.get("chat"):
+        return jsonify(errore=errore_utente("A chi lo mando? Non hai scelto la chat.")), 400
+    try:
+        r = wa("invia_media", {"chat": d["chat"], "file": m["file"], "didascalia": d.get("didascalia", "")})
+    except RuntimeError as e:
+        return jsonify(errore=str(e)), 503
+    return jsonify(r)
+
+
+# ============================ APP PER TELEFONO ============================
+@app.route("/api/telefono")
+@richiede_accesso
+def api_telefono():
+    """Indirizzi da aprire sul telefono e relativo codice QR."""
+    import socket
+
+    indirizzi = []
+    if getattr(config, "INDIRIZZO_TELEFONO", ""):
+        indirizzi.append(config.INDIRIZZO_TELEFONO)
+    if config.HOST_PANNELLO not in ("127.0.0.1", "localhost"):
+        try:
+            s_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s_udp.connect(("10.255.255.255", 1))
+            indirizzi.append(f"http://{s_udp.getsockname()[0]}:{config.PORTA_PANNELLO}")
+            s_udp.close()
+        except OSError:
+            pass
+    qr = None
+    if indirizzi:
+        try:
+            import segno
+
+            qr = segno.make(indirizzi[0], error="m").svg_data_uri(scale=6, dark="#00e0ff", light="#03080f", border=2)
+        except ImportError:
+            qr = None
+    return jsonify(indirizzi=indirizzi, qr=qr, solo_locale=config.HOST_PANNELLO in ("127.0.0.1", "localhost"))
+
+
 @app.route("/api/promemoria")
 @richiede_accesso
 def api_promemoria():
@@ -683,7 +803,10 @@ def api_registro():
 @app.route("/api/profilo")
 @richiede_accesso
 def profilo():
-    return jsonify(nome=config.NOME_UTENTE, stile_saggio=config.STILE_SAGGIO,
+    import voce_jarvis
+
+    voce_server = getattr(config, "VOCE_MOTORE", "piper") == "piper" and voce_jarvis.disponibile()
+    return jsonify(nome=config.NOME_UTENTE, stile_saggio=config.STILE_SAGGIO, voce_server=voce_server,
                    manuali=esperto.manuali_caricati(), insulti=getattr(config, "INSULTI_ATTIVI", True))
 
 

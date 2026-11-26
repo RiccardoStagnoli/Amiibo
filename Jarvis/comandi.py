@@ -145,6 +145,9 @@ class Interprete:
             (r"^(non disturbare|modalita non disturbare)( per (?P<n>\S+) (?P<u>or[ae]|minuti))?$", self.non_disturbare),
             (r"^(fine|basta|disattiva) (non disturbare|modalita non disturbare)$", lambda m: self.s["fine_non_disturbare"]()),
             (r"^(riepilogo|briefing)( (di oggi|giornaliero))?$", lambda m: risposta(self.s["riepilogo"]())),
+            # --- Foto e video ---
+            (r"^(mostra(mi)?|fammi vedere|trova|apri) (la |il |le |i |una |un )?(foto|video|immagine|immagini)( (di|della|del|dello|delle|dei|degli|con|sul|sulla))? (?P<q>.+)$", self.mostra_media),
+            (r"^(mostra(mi)?|apri) (le |i )?(mie )?(foto|video|galleria)$", lambda m: risposta("Galleria aperta.", azione_pannello="media")),
             # --- Memoria: cose che mi insegni ---
             (r"^quando (dico|scrivo) (?P<a>.+?),? (intendi|fai|significa|vuol dire|esegui) (?P<b>.+)$", self.insegna_comando),
             (r"^(dimentica|cancella) il comando (?P<a>.+)$", self.dimentica_comando),
@@ -380,3 +383,13 @@ class Interprete:
         testo, brani = self.s["chiedi"](domanda, solo=self._fonte(normalizza(domanda)))
         return risposta(testo, "ok" if brani else "incerto",
                         fonti=[{"manuale": b["manuale"], "sezione": b["sezione"]} for b in brani])
+
+    # ------------------------------ Foto e video ------------------------------
+    def mostra_media(self, m):
+        import media
+
+        trovati = media.cerca(m["q"])
+        if not trovati:
+            return risposta(incerto(f"Nessuna foto o video con una descrizione che corrisponda al 90% a '{m['q'].strip()}'."), "incerto")
+        return risposta(f"Trovati {len(trovati)}: " + "; ".join(x["descrizione"] for x in trovati[:5]) + ".",
+                        azione_pannello="media", media=[x["id"] for x in trovati])

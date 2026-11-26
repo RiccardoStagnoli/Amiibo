@@ -43,7 +43,7 @@ const dataOra = (iso) => {
 // PREFERENZE (solo in questo dispositivo)
 // =========================================================================
 const PREF_BASE = {
-  voce: '', tono: 0.35, velocita: 0.85, saggio: null, attiva: true,
+  voce: '', tono: 0.35, velocita: 0.85, saggio: null, attiva: true, motore: 'server',
   tema: 'ciano', suoni: true, particelle: true, avvio: true,
 };
 let pref = { ...PREF_BASE };
@@ -132,8 +132,9 @@ function caricaVoci() {
 
 function aggiornaStatoVoce() {
   const p = $('#stato-voce');
-  if (!sintesi || !voci.length) { p.textContent = 'Voce n.d.'; p.className = 'pillola ko'; return; }
-  p.textContent = pref.attiva ? 'Voce on' : 'Voce off';
+  const server = profilo.voce_server && pref.motore !== 'browser';
+  if (!server && (!sintesi || !voci.length)) { p.textContent = 'Voce n.d.'; p.className = 'pillola ko'; return; }
+  p.textContent = pref.attiva ? (server ? 'Voce Jarvis' : 'Voce browser') : 'Voce off';
   p.className = 'pillola ' + (pref.attiva ? 'ok' : '');
 }
 
@@ -145,12 +146,51 @@ function mostraParlato(testo, errore) {
   if (errore) setTimeout(() => $('#nucleo').classList.remove('errore'), 2500);
 }
 
-function parla(testo, errore = false) {
+// Testo adatto alla voce: niente elenchi di estratti, niente prefissi tecnici, lunghezza limitata.
+function perLaVoce(testo) {
+  let t = String(testo);
+  if (t.startsWith('(Ollama')) {
+    const m = t.match(/\[1\][^\n]*\n([\s\S]*?)(\n\[2\]|$)/);
+    t = 'Ecco cosa dicono le mie fonti. ' + (m ? m[1] : '');
+  }
+  t = t.replace(/\[\d+\]/g, '').replace(/\s+/g, ' ').trim();
+  return t.length > 700 ? t.slice(0, 700).replace(/[^.!?]*$/, '') || t.slice(0, 700) : t;
+}
+
+// Voce: risposta vocale (domande vocali, rapporto, annunci, pulsanti "Leggi").
+function parla(testo, errore = false, voce = true) {
   if (!testo) return;
   mostraParlato(testo, errore);
-  if (!sintesi || !pref.attiva) return;
-  coda.push(testo);
+  if (!voce || !pref.attiva) return;
+  const usaServer = profilo.voce_server && pref.motore !== 'browser';
+  if (!usaServer && !sintesi) return;
+  coda.push(perLaVoce(testo));
   if (!parlaOra) prossimo();
+}
+
+// Solo testo: risposta a domande scritte e a pulsanti (niente voce).
+function scrivi(testo, errore = false) {
+  if (!testo) return;
+  mostraParlato(testo, errore);
+  if (!$('#centrale').classList.contains('visibile')) notifica(testo.length > 300 ? testo.slice(0, 300) + '…' : testo, errore);
+}
+
+// Voce del server (Piper): stessa voce su PC, telefono e Rabbit R1.
+let audioCorrente = null;
+async function prossimoServer(testo) {
+  try {
+    const r = await fetch('/api/voce', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ testo }) });
+    if (!r.ok) throw new Error('voce server non disponibile');
+    const url = URL.createObjectURL(await r.blob());
+    audioCorrente = new Audio(url);
+    audioCorrente.onplay = () => { $('#sblocca').hidden = true; attivaOnde(true); };
+    audioCorrente.onended = audioCorrente.onerror = () => { URL.revokeObjectURL(url); coda.shift(); prossimo(); };
+    await audioCorrente.play();
+  } catch (e) {
+    if (e && e.name === 'NotAllowedError') { $('#sblocca').hidden = false; attivaOnde(false); return; } // serve un tocco
+    pref.motore = 'browser'; // ripiego sulla voce del browser
+    prossimo();
+  }
 }
 
 function attivaOnde(si) {
@@ -162,6 +202,8 @@ function prossimo() {
   const testo = coda[0];
   if (testo === undefined) { parlaOra = false; attivaOnde(false); return; }
   parlaOra = true;
+  if (profilo.voce_server && pref.motore !== 'browser') { prossimoServer(testo); return; }
+  if (!sintesi) { coda.length = 0; parlaOra = false; return; }
   const u = new SpeechSynthesisUtterance(testo);
   const v = voci.find((x) => x.name === pref.voce);
   if (v) u.voice = v;
@@ -175,8 +217,12 @@ function prossimo() {
   setTimeout(() => { if (!partito) { sintesi.cancel(); $('#sblocca').hidden = false; attivaOnde(false); } }, 2500);
 }
 
-$('#sblocca').addEventListener('click', () => { $('#sblocca').hidden = true; prossimo(); });
+$('#sblocca').addEventListener('click', () => {
+  $('#sblocca').hidden = true;
+  if (audioCorrente) audioCorrente.play().catch(() => { $('#sblocca').hidden = false; }); else prossimo();
+});
 $('#btn-zitto').addEventListener('click', () => {
+  if (audioCorrente) { audioCorrente.pause(); audioCorrente = null; }
   coda.length = 0; if (sintesi) sintesi.cancel(); parlaOra = false; attivaOnde(false);
 });
 
@@ -276,10 +322,11 @@ function mostraSezione(nome) {
   $$('#menu button').forEach((x) => x.classList.toggle('attivo', x.dataset.sezione === nome));
   $$('.sezione').forEach((s) => s.classList.toggle('visibile', s.id === nome));
   if (nome === 'whatsapp') caricaChat();
-  if (nome === 'impostazioni') { caricaImpostazioni(); caricaRegistro(); }
+  if (nome === 'impostazioni') { caricaImpostazioni(); caricaRegistro(); caricaTelefono(); }
   if (nome === 'gmail') caricaSpazio();
   if (nome === 'msi') aggiornaSistema();
   if (nome === 'memoria') caricaMemoria();
+  if (nome === 'media') caricaMedia();
 }
 
 setInterval(() => { $('#orologio').textContent = new Date().toLocaleTimeString('it-IT'); }, 1000);
@@ -300,22 +347,24 @@ $('#temi').addEventListener('click', (e) => {
 // =========================================================================
 // BARRA COMANDI (testo o voce)
 // =========================================================================
-function gestisciRisposta(r) {
+// voce = true se la domanda e' arrivata a voce: rispondo a voce. Scritta: rispondo per iscritto.
+function gestisciRisposta(r, voce = false) {
   const errore = r.esito === 'errore_utente' || r.esito === 'errore';
-  parla(r.testo, errore);
+  if (voce) parla(r.testo, errore, true); else scrivi(r.testo, errore);
   if (r.esito === 'errore_utente') suono('errore');
   if (r.immagine) { $('#msi-schermo').src = r.immagine; $('#msi-schermo').hidden = false; mostraSezione('msi'); }
   if (r.azione_pannello === 'rapporto') rapporto(false);
   if (r.azione_pannello === 'pulizia') { mostraSezione('gmail'); analizzaPosta(); }
-  if (r.fonti && r.fonti.length) mostraParlato(r.testo + '\nFonti: ' + r.fonti.map((f) => f.sezione).join(', '));
+  if (r.azione_pannello === 'media') { mostraSezione('media'); evidenziaMedia(r.media || []); }
+  if (r.fonti && r.fonti.length) mostraParlato(r.testo + '\nFonti: ' + r.fonti.map((f) => `${f.manuale} (${f.sezione})`).join(', '));
 }
 
-async function eseguiComando(testo) {
+async function eseguiComando(testo, voce = false) {
   try {
     const r = await api('/api/comando', { testo });
-    gestisciRisposta(r);
+    gestisciRisposta(r, voce);
     aggiornaPromemoria();
-  } catch (e) { parla(F.errore(e.message), true); }
+  } catch (e) { (voce ? parla : scrivi)(F.errore(e.message), true); }
 }
 
 $('#form-comando').addEventListener('submit', (e) => {
@@ -338,7 +387,8 @@ function dettatura(bottone, alRisultato) {
     r.start();
   });
 }
-dettatura($('#btn-mic-comando'), (t) => { $('#testo-comando').value = t; eseguiComando(t); });
+// Domanda a voce dal microfono del pannello -> risposta a voce.
+dettatura($('#btn-mic-comando'), (t) => { $('#testo-comando').value = t; eseguiComando(t, true); });
 
 // =========================================================================
 // ANNUNCI DAL SERVER (comandi vocali dati al PC server)
@@ -348,7 +398,8 @@ async function controllaAnnunci() {
   try {
     const r = await api('/api/annunci?dopo=' + (ultimoAnnuncio ?? 0));
     if (ultimoAnnuncio === null) { ultimoAnnuncio = r.ultimo; return; } // ignora quelli vecchi
-    r.annunci.forEach((a) => { notifica(a.testo); gestisciRisposta({ ...a, esito: 'ok' }); });
+    // Annunci = risposte a comandi vocali dati al PC server, promemoria, riepilogo: a voce.
+    r.annunci.forEach((a) => { notifica(a.testo); gestisciRisposta({ ...a, esito: 'ok' }, true); });
     if (r.annunci.length) aggiornaPromemoria();
     ultimoAnnuncio = r.ultimo;
   } catch { /* server non raggiungibile */ }
@@ -618,8 +669,8 @@ function disegnaMessaggio(m) {
         class: 'btn piccolo',
         onclick: async () => {
           const scelte = opzioni.map((l) => l.querySelector('input')).filter((i) => i.checked).map((i) => i.value);
-          if (!scelte.length) { parla(rimprovero('Non hai scelto nessuna opzione, genio.', 'Nessuna opzione scelta.'), true); return; }
-          try { await api('/api/wa/vota', { messaggio: m.id, opzioni: scelte }); parla(F.votato()); } catch (e) { parla(F.errore(e.message), true); }
+          if (!scelte.length) { scrivi(rimprovero('Non hai scelto nessuna opzione, genio.', 'Nessuna opzione scelta.'), true); return; }
+          try { await api('/api/wa/vota', { messaggio: m.id, opzioni: scelte }); scrivi(F.votato()); } catch (e) { scrivi(F.errore(e.message), true); }
         },
       }, 'Vota')));
   }
@@ -648,14 +699,14 @@ $('#form-invio').addEventListener('submit', async (e) => {
   e.preventDefault();
   const testo = $('#testo-invio').value.trim();
   if (!chatAperta) return;
-  if (!testo) { parla(rimprovero('Messaggio vuoto. Scrivi qualcosa, coglione.', 'Messaggio vuoto.'), true); suono('errore'); return; }
+  if (!testo) { scrivi(rimprovero('Messaggio vuoto. Scrivi qualcosa, coglione.', 'Messaggio vuoto.'), true); suono('errore'); return; }
   try {
     await api('/api/wa/invia', { chat: chatAperta.id, testo, cita: citazione ? citazione.id : undefined });
     $('#testo-invio').value = '';
     citazione = null; $('#citazione').hidden = true;
-    parla(F.inviato());
+    scrivi(F.inviato());
     setTimeout(caricaMessaggi, 800);
-  } catch (err) { parla(F.errore(err.message), true); }
+  } catch (err) { scrivi(F.errore(err.message), true); }
 });
 dettatura($('#btn-detta'), (t) => { $('#testo-invio').value = t; });
 
@@ -701,11 +752,11 @@ $('#cerca-inoltra').addEventListener('input', disegnaInoltro);
 $('#dlg-inoltra').addEventListener('close', async () => {
   if ($('#dlg-inoltra').returnValue !== 'ok' || !daInoltrare) return;
   const dest = $$('#lista-inoltra input:checked').map((i) => i.value);
-  if (!dest.length) { parla(rimprovero('Non hai scelto nessun destinatario. Sveglia.', 'Nessun destinatario scelto.'), true); return; }
+  if (!dest.length) { scrivi(rimprovero('Non hai scelto nessun destinatario. Sveglia.', 'Nessun destinatario scelto.'), true); return; }
   try {
     const r = await api('/api/wa/inoltra', { messaggio: daInoltrare.id, destinazioni: dest });
-    parla(F.inoltrato(r.inoltrati));
-  } catch (e) { parla(F.errore(e.message), true); }
+    scrivi(F.inoltrato(r.inoltrati));
+  } catch (e) { scrivi(F.errore(e.message), true); }
 });
 
 // =========================================================================
@@ -766,7 +817,7 @@ async function analizzaPosta() {
   try {
     const r = await api('/api/gmail/pulizia');
     disegnaPulizia(r, false);
-    parla(`${r.filter((x) => x.sicura).length} email sopra la soglia del 90 per cento, ${r.filter((x) => !x.sicura).length} dubbie.`);
+    scrivi(`${r.filter((x) => x.sicura).length} email sopra la soglia del 90 per cento, ${r.filter((x) => !x.sicura).length} dubbie.`);
   } catch (e) { $('#lista-pulizia').replaceChildren(el('p', { class: 'errore' }, e.message)); }
 }
 $('#btn-analizza').addEventListener('click', analizzaPosta);
@@ -776,22 +827,22 @@ $('#btn-pesanti').addEventListener('click', async () => {
 });
 $$('#azioni-pulizia [data-azione]').forEach((b) => b.addEventListener('click', async () => {
   const ids = $$('#lista-pulizia input:checked').map((i) => i.value);
-  if (!ids.length) { parla(rimprovero('Non hai selezionato niente, testa vuota.', 'Nessuna email selezionata.'), true); suono('errore'); return; }
+  if (!ids.length) { scrivi(rimprovero('Non hai selezionato niente, testa vuota.', 'Nessuna email selezionata.'), true); suono('errore'); return; }
   if (b.dataset.azione === 'cestina' && !confirm(`Spostare ${ids.length} email nel cestino?`)) return;
   try {
     const r = await api('/api/gmail/azione', { azione: b.dataset.azione, ids });
-    parla(`Fatto su ${r.fatte} email.`);
+    scrivi(`Fatto su ${r.fatte} email.`);
     $$('#lista-pulizia input:checked').forEach((i) => i.closest('.voce').remove());
     caricaSpazio();
-  } catch (e) { parla(F.errore(e.message), true); }
+  } catch (e) { scrivi(F.errore(e.message), true); }
 }));
 $('#btn-svuota').addEventListener('click', async () => {
   if (!confirm('Eliminare DEFINITIVAMENTE tutte le email nel cestino di Gmail? Non si può annullare.')) return;
   try {
     const r = await api('/api/gmail/azione', { azione: 'svuota_cestino', conferma: true });
-    parla(`Eliminate definitivamente ${r.eliminate} email.`);
+    scrivi(`Eliminate definitivamente ${r.eliminate} email.`);
     caricaSpazio();
-  } catch (e) { parla(F.errore(e.message), true); }
+  } catch (e) { scrivi(F.errore(e.message), true); }
 });
 
 // =========================================================================
@@ -814,8 +865,8 @@ $('#btn-teams').addEventListener('click', async () => {
     const t = await api('/api/teams/nuovi');
     disegnaTeams(t);
     if (t.configurato) {
-      parla(F.teams(t.messaggi.length));
-      t.messaggi.slice(0, 8).forEach((m) => parla(`${m.da}, ${m.dove}: ${m.testo}`));
+      scrivi(F.teams(t.messaggi.length));
+      t.messaggi.slice(0, 8).forEach((m) => scrivi(`${m.da}, ${m.dove}: ${m.testo}`));
     }
   } catch (e) { $('#lista-teams').replaceChildren(el('p', { class: 'errore' }, e.message)); }
 });
@@ -840,7 +891,7 @@ $('#form-meccanica').addEventListener('submit', async (e) => {
   e.preventDefault();
   const domanda = $('#domanda').value.trim();
   const box = $('#risposta-meccanica');
-  if (!domanda) { parla(rimprovero('Domanda vuota. Complimenti.', 'Domanda vuota.'), true); return; }
+  if (!domanda) { scrivi(rimprovero('Domanda vuota. Complimenti.', 'Domanda vuota.'), true); return; }
   box.replaceChildren(el('p', { class: 'nota' }, 'Consulto il manuale...'));
   try {
     const r = await api('/api/comando', { testo: 'meccanica: ' + domanda });
@@ -848,7 +899,7 @@ $('#form-meccanica').addEventListener('submit', async (e) => {
       r.fonti && r.fonti.length ? el('h3', {}, 'Fonti') : null,
       ...(r.fonti || []).map((f, i) => el('div', { class: 'sotto' }, `[${i + 1}] ${f.manuale} — ${f.sezione}`)));
     const senzaAI = r.testo.startsWith('(Ollama');
-    parla(r.fonti && r.fonti.length ? F.manuale() + ' ' + (senzaAI ? r.testo.split('\n').slice(2, 6).join(' ').slice(0, 600) : r.testo) : r.testo);
+    scrivi(r.fonti && r.fonti.length ? F.manuale() + ' ' + (senzaAI ? r.testo.split('\n').slice(2, 6).join(' ').slice(0, 600) : r.testo) : r.testo);
   } catch (err) { box.replaceChildren(el('p', { class: 'errore' }, err.message)); }
 });
 
@@ -856,7 +907,7 @@ $('#form-meccanica').addEventListener('submit', async (e) => {
 // MEMORIA: fatti, documenti, comandi insegnati, non capiti
 // =========================================================================
 async function eliminaMemoria(tipo, id) {
-  try { await api('/api/memoria/elimina', { tipo, id }); caricaMemoria(); } catch (e) { parla(F.errore(e.message), true); }
+  try { await api('/api/memoria/elimina', { tipo, id }); caricaMemoria(); } catch (e) { scrivi(F.errore(e.message), true); }
 }
 
 function rigaMemoria(titolo, sotto, tipo, id, extraBtn) {
@@ -892,37 +943,209 @@ $('#form-fatto').addEventListener('submit', async (e) => {
   try {
     const r = await api('/api/memoria/fatto', { testo });
     $('#testo-fatto').value = '';
-    parla(r.nuovo ? 'Memorizzato.' : 'Lo sapevo già.');
+    scrivi(r.nuovo ? 'Memorizzato.' : 'Lo sapevo già.');
     caricaMemoria();
-  } catch (err) { parla(err.message, true); suono('errore'); }
+  } catch (err) { scrivi(err.message, true); suono('errore'); }
 });
 
 $('#form-alias').addEventListener('submit', async (e) => {
   e.preventDefault();
   try {
     await api('/api/memoria/comando', { frase: $('#alias-frase').value, comando: $('#alias-comando').value });
-    parla(`Imparato: quando dici "${$('#alias-frase').value.trim()}" eseguo "${$('#alias-comando').value.trim()}".`);
+    scrivi(`Imparato: quando dici "${$('#alias-frase').value.trim()}" eseguo "${$('#alias-comando').value.trim()}".`);
     $('#alias-frase').value = ''; $('#alias-comando').value = '';
     caricaMemoria();
-  } catch (err) { parla(err.message, true); suono('errore'); }
+  } catch (err) { scrivi(err.message, true); suono('errore'); }
 });
 
 $('#form-documento').addEventListener('submit', async (e) => {
   e.preventDefault();
   const file = $('#file-documento').files[0];
-  if (!file) { parla(rimprovero('Non hai scelto nessun file, genio.', 'Nessun file scelto.'), true); suono('errore'); return; }
+  if (!file) { scrivi(rimprovero('Non hai scelto nessun file, genio.', 'Nessun file scelto.'), true); suono('errore'); return; }
   const dati = new FormData();
   dati.append('file', file);
-  parla('Leggo il documento...');
+  scrivi('Leggo il documento...');
   try {
     const r = await fetch('/api/memoria/documento', { method: 'POST', body: dati });
     const corpo = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(corpo.errore || `Errore ${r.status}`);
-    parla(`Documento ${corpo.nome} imparato: ${corpo.caratteri} caratteri di testo.`);
+    scrivi(`Documento ${corpo.nome} imparato: ${corpo.caratteri} caratteri di testo.`);
     $('#file-documento').value = '';
     caricaMemoria();
-  } catch (err) { parla(err.message, true); suono('errore'); }
+  } catch (err) { scrivi(err.message, true); suono('errore'); }
 });
+
+// =========================================================================
+// FOTO E VIDEO
+// =========================================================================
+let mediaCache = [];
+let daEvidenziare = new Set();
+
+function caricaFileMedia(file, nome) {
+  const descrizione = $('#descr-media').value.trim();
+  const stato = $('#stato-media');
+  if (!file) return;
+  if (descrizione.split(/\s+/).filter(Boolean).length < 2) {
+    scrivi(rimprovero('Prima scrivi una descrizione di almeno due parole, o non la ritroverai mai.', 'Serve una descrizione di almeno due parole.'), true);
+    suono('errore');
+    return;
+  }
+  const dati = new FormData();
+  dati.append('file', file, nome || file.name);
+  dati.append('descrizione', descrizione);
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/media');
+  xhr.upload.onprogress = (e) => { if (e.lengthComputable) stato.textContent = `Caricamento ${Math.round((e.loaded / e.total) * 100)}%...`; };
+  xhr.onload = () => {
+    let r = {};
+    try { r = JSON.parse(xhr.responseText); } catch { /* niente */ }
+    if (xhr.status === 401) { location.href = '/accesso'; return; }
+    if (xhr.status >= 400) { stato.textContent = ''; scrivi(r.errore || `Errore ${xhr.status}`, true); suono('errore'); return; }
+    stato.textContent = '';
+    $('#descr-media').value = '';
+    scrivi(`${r.tipo === 'video' ? 'Video' : 'Foto'} salvato: ${r.descrizione}.`);
+    caricaMedia();
+  };
+  xhr.onerror = () => { stato.textContent = ''; scrivi('Caricamento non riuscito: server non raggiungibile.', true); };
+  xhr.send(dati);
+}
+['#file-media', '#foto-ora', '#video-ora'].forEach((id) => $(id).addEventListener('change', (e) => {
+  caricaFileMedia(e.target.files[0]);
+  e.target.value = '';
+}));
+
+function evidenziaMedia(ids) { daEvidenziare = new Set(ids); disegnaGalleria(); }
+
+async function caricaMedia() {
+  try { mediaCache = await api('/api/media'); disegnaGalleria(); } catch (e) { $('#galleria').replaceChildren(el('p', { class: 'errore' }, e.message)); }
+}
+
+function disegnaGalleria() {
+  const f = ($('#cerca-media').value || '').toLowerCase();
+  const lista = mediaCache.filter((m) => m.descrizione.toLowerCase().includes(f));
+  if (!lista.length) { $('#galleria').replaceChildren(el('p', { class: 'nota' }, mediaCache.length ? 'Nessun risultato.' : 'Galleria vuota.')); return; }
+  $('#galleria').replaceChildren(...lista.map((m) => el('div', { class: 'scheda-media' + (daEvidenziare.has(m.id) ? ' evidenziata' : '') },
+    m.tipo === 'video' ? el('video', { src: '/media/' + m.file, controls: true, preload: 'metadata', playsinline: true })
+      : el('a', { href: '/media/' + m.file, target: '_blank', rel: 'noopener' }, el('img', { src: '/media/' + m.file, alt: m.descrizione, loading: 'lazy' })),
+    el('div', { class: 'info' },
+      el('strong', {}, m.descrizione),
+      el('span', { class: 'sotto' }, `${m.tipo} · ${m.kb > 1024 ? (m.kb / 1024).toFixed(1) + ' MB' : m.kb + ' KB'} · ${dataOra(m.ora)}`),
+      el('div', { class: 'azioni', style: 'margin:0' },
+        el('button', { class: 'btn piccolo', onclick: () => apriInvioMedia(m) }, 'WhatsApp'),
+        el('a', { class: 'btn piccolo sec', href: '/media/' + m.file, download: m.descrizione.replace(/[^\w\s-]/g, '') + m.file.slice(m.file.lastIndexOf('.')) }, 'Scarica'),
+        el('button', {
+          class: 'btn piccolo sec',
+          onclick: async () => {
+            if (!confirm('Eliminare questo file?')) return;
+            await api('/api/media/elimina', { id: m.id }).catch(() => {});
+            caricaMedia();
+          },
+        }, 'Elimina'))))));
+}
+$('#cerca-media').addEventListener('input', disegnaGalleria);
+
+let mediaDaInviare = null;
+async function apriInvioMedia(m) {
+  mediaDaInviare = m;
+  if (!chatCache.length) { try { chatCache = await api('/api/wa/chat'); } catch (e) { scrivi(e.message, true); return; } }
+  $('#cerca-dest-media').value = '';
+  $('#didascalia-media').value = m.descrizione;
+  disegnaDestMedia();
+  $('#dlg-media').showModal();
+}
+function disegnaDestMedia() {
+  const f = $('#cerca-dest-media').value.toLowerCase();
+  $('#lista-dest-media').replaceChildren(...chatCache.filter((c) => c.nome.toLowerCase().includes(f)).slice(0, 60).map((c) =>
+    el('label', { class: 'interruttore' }, el('input', { type: 'radio', name: 'dest-media', value: c.id }), el('span', {}, c.nome))));
+}
+$('#cerca-dest-media').addEventListener('input', disegnaDestMedia);
+$('#dlg-media').addEventListener('close', async () => {
+  if ($('#dlg-media').returnValue !== 'ok' || !mediaDaInviare) return;
+  const scelta = document.querySelector('input[name=dest-media]:checked');
+  if (!scelta) { scrivi(rimprovero('Non hai scelto a chi mandarlo. Sveglia.', 'Nessuna chat scelta.'), true); return; }
+  try {
+    const r = await api('/api/media/invia', { id: mediaDaInviare.id, chat: scelta.value, didascalia: $('#didascalia-media').value });
+    scrivi('Inviato su WhatsApp' + (r.come_documento ? ' come documento (file grande).' : '.'));
+  } catch (e) { scrivi(F.errore(e.message), true); }
+});
+
+// Fotocamera / webcam (serve https o localhost)
+let flusso = null;
+let registratore = null;
+let fotocamera = 'environment';
+async function apriWebcam() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    scrivi("Fotocamera non disponibile da questo indirizzo: serve https o localhost. Sul telefono usa 'Scatta foto' / 'Registra video'.", true);
+    return;
+  }
+  try {
+    if (flusso) flusso.getTracks().forEach((t) => t.stop());
+    flusso = await navigator.mediaDevices.getUserMedia({ video: { facingMode: fotocamera }, audio: true })
+      .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: fotocamera } }));
+    $('#webcam-video').srcObject = flusso;
+    $('#webcam-zona').hidden = false;
+  } catch (e) { scrivi('Accesso alla fotocamera negato o non disponibile: ' + e.message, true); }
+}
+function chiudiWebcam() {
+  if (registratore && registratore.state === 'recording') registratore.stop();
+  if (flusso) flusso.getTracks().forEach((t) => t.stop());
+  flusso = null;
+  $('#webcam-zona').hidden = true;
+}
+$('#btn-webcam').addEventListener('click', apriWebcam);
+$('#btn-chiudi-webcam').addEventListener('click', chiudiWebcam);
+$('#btn-gira').addEventListener('click', () => { fotocamera = fotocamera === 'environment' ? 'user' : 'environment'; apriWebcam(); });
+$('#btn-scatta').addEventListener('click', () => {
+  const v = $('#webcam-video');
+  if (!v.videoWidth) return;
+  const c = document.createElement('canvas');
+  c.width = v.videoWidth; c.height = v.videoHeight;
+  c.getContext('2d').drawImage(v, 0, 0);
+  c.toBlob((b) => caricaFileMedia(b, `foto_${Date.now()}.jpg`), 'image/jpeg', 0.9);
+  suono('notifica');
+});
+$('#btn-registra').addEventListener('click', () => {
+  const b = $('#btn-registra');
+  if (registratore && registratore.state === 'recording') { registratore.stop(); return; }
+  if (!flusso || !window.MediaRecorder) { scrivi('Registrazione video non supportata da questo browser.', true); return; }
+  const pezzi = [];
+  const tipo = MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
+  registratore = new MediaRecorder(flusso, { mimeType: tipo });
+  registratore.ondataavailable = (e) => { if (e.data.size) pezzi.push(e.data); };
+  registratore.onstop = () => {
+    b.textContent = 'Registra video'; b.classList.remove('ascolta');
+    caricaFileMedia(new Blob(pezzi, { type: tipo }), `video_${Date.now()}.${tipo === 'video/mp4' ? 'mp4' : 'webm'}`);
+  };
+  registratore.start();
+  b.textContent = 'Stop'; b.classList.add('ascolta');
+});
+
+// =========================================================================
+// APP PER TELEFONO (installazione)
+// =========================================================================
+let richiestaInstallazione = null;
+addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); richiestaInstallazione = e; $('#btn-installa').hidden = false; });
+$('#btn-installa').addEventListener('click', async () => {
+  if (!richiestaInstallazione) return;
+  richiestaInstallazione.prompt();
+  await richiestaInstallazione.userChoice;
+  richiestaInstallazione = null;
+  $('#btn-installa').hidden = true;
+});
+if ('serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register('/sw.js').catch(() => {});
+
+async function caricaTelefono() {
+  const zona = $('#telefono-zona');
+  try {
+    const t = await api('/api/telefono');
+    const parti = [];
+    if (t.qr) parti.push(el('img', { class: 'qr-telefono', src: t.qr, alt: 'Codice QR per aprire Jarvis sul telefono' }));
+    if (t.indirizzi.length) parti.push(el('p', {}, 'Inquadra il codice con la fotocamera del telefono oppure apri: ', el('strong', {}, t.indirizzi.join('  oppure  '))));
+    if (t.solo_locale) parti.push(el('p', {}, 'Ora Jarvis è visibile solo da questo PC. Per il telefono: GUIDA, Fase 19 (HOST_PANNELLO e password, oppure Tailscale).'));
+    parti.push(el('p', {}, 'Sul telefono, dopo averlo aperto: Android/Chrome → menu ⋮ → "Installa app" (o "Aggiungi a schermata Home"); iPhone/Safari → Condividi → "Aggiungi alla schermata Home".'));
+    zona.replaceChildren(...parti);
+  } catch (e) { zona.replaceChildren(e.message); }
+}
 
 // =========================================================================
 // IMPOSTAZIONI
@@ -960,7 +1183,7 @@ async function caricaImpostazioni() {
 }
 
 $$('input[name=modo]').forEach((r) => r.addEventListener('change', async () => {
-  try { impWa = await api('/api/wa/impostazioni', { risposta_automatica: r.value }); } catch (e) { parla(F.errore(e.message), true); }
+  try { impWa = await api('/api/wa/impostazioni', { risposta_automatica: r.value }); } catch (e) { scrivi(F.errore(e.message), true); }
 }));
 
 function preparaControlli() {
@@ -972,6 +1195,8 @@ function preparaControlli() {
   $('#chk-particelle').checked = pref.particelle;
   $('#chk-avvio').checked = pref.avvio;
   $('#sel-voce').addEventListener('change', (e) => { pref.voce = e.target.value; salvaPref(); });
+  $('#sel-motore').value = pref.motore === 'browser' ? 'browser' : 'server';
+  $('#sel-motore').addEventListener('change', (e) => { pref.motore = e.target.value; salvaPref(); aggiornaStatoVoce(); });
   $('#tono').addEventListener('input', (e) => { pref.tono = e.target.value; salvaPref(); });
   $('#velocita').addEventListener('input', (e) => { pref.velocita = e.target.value; salvaPref(); });
   $('#chk-saggio').addEventListener('change', (e) => { pref.saggio = e.target.checked; salvaPref(); });
@@ -989,6 +1214,7 @@ function preparaControlli() {
   applicaTema();
   preparaControlli();
   try { profilo = await api('/api/profilo'); } catch { /* valori predefiniti */ }
+  aggiornaStatoVoce();
   $('#nota-manuale').textContent = 'Fonte: ' + (profilo.manuali || []).join(', ') + ' (manuale del 1907). Risponde solo se il manuale copre almeno il 90% dei termini.';
   $('#chk-saggio').checked = saggio();
   if (sintesi) { caricaVoci(); sintesi.addEventListener('voiceschanged', caricaVoci); }

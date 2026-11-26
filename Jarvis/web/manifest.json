@@ -1,10 +1,19 @@
 {
+  "id": "/",
   "name": "J.A.R.V.I.S.",
   "short_name": "Jarvis",
+  "description": "Assistente personale Jarvis",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "orientation": "any",
+  "orientation": "portrait",
   "background_color": "#03080f",
   "theme_color": "#03080f",
-  "icons": [{ "src": "/web/icona.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+  "lang": "it",
+  "icons": [
+    { "src": "/web/icona-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/web/icona-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/web/icona-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/web/icona.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
 }

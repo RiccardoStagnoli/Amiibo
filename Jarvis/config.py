@@ -86,3 +86,19 @@ MACRO = {
     "modalita studio": ["non disturbare per 2 ore", "ricordami tra 50 minuti di fare una pausa"],
     "buonanotte": ["spegni msi", "promemoria"],
 }
+
+# ------------------------- VOCE DI JARVIS (GUIDA, Fase 18) -------------------------
+# "piper"   = voce neurale offline generata dal server (stessa voce su PC, telefono, R1)
+# "browser" = voci del browser/di Windows (come prima)
+VOCE_MOTORE = "piper"
+# Voci italiane: it_IT-riccardo-x_low (maschile), it_IT-paola-medium, it_IT-serena-medium, it_IT-serena-high
+VOCE_PIPER = "it_IT-riccardo-x_low"
+# "jarvis" = leggero effetto metallico da assistente; "nessuno" = voce pulita
+EFFETTO_VOCE = "jarvis"
+# Velocita': 1.0 normale, 1.15 piu' lenta, 0.9 piu' veloce
+VELOCITA_PIPER = 1.0
+
+# ------------------------- APP PER TELEFONO (GUIDA, Fase 19) -------------------------
+# Indirizzo da aprire sul telefono (mostrato come QR in Impostazioni), es. l'indirizzo
+# https://....ts.net di Tailscale. Vuoto = Jarvis prova a ricavare l'IP di rete del server.
+INDIRIZZO_TELEFONO = ""

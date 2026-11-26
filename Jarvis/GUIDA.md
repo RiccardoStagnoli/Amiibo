@@ -357,6 +357,57 @@ Jarvis non "riaddestra" un'intelligenza artificiale: **salva** le informazioni c
 
 Per fare una copia di sicurezza di tutto ciò che Jarvis ha imparato, copia la cartella `C:\Jarvis\dati` su una chiavetta o su Google Drive.
 
+## Fase 18 – Voce di Jarvis e risposte a voce o per iscritto
+
+**Voce.** Jarvis usa **Piper**, una sintesi vocale neurale open source presa da GitHub (`github.com/OHF-Voice/piper1-gpl`). Funziona offline sul PC server e manda l'audio al browser, quindi hai **la stessa voce su PC, telefono e Rabbit R1**.
+- Al primo utilizzo il server scarica la voce (28 MB) nella cartella `C:\Jarvis\modelli\voci`.
+- In `config.py`:
+  - `VOCE_PIPER` = voce: `it_IT-riccardo-x_low` (maschile, predefinita), `it_IT-paola-medium`, `it_IT-serena-medium`, `it_IT-serena-high` (femminili, qualità migliore);
+  - `EFFETTO_VOCE = "jarvis"` aggiunge un leggero effetto metallico da assistente (`"nessuno"` per voce pulita);
+  - `VELOCITA_PIPER`: 1.0 normale, 1.15 più lenta.
+- Pannello → Impostazioni → Voce → **Motore**: "Voce di Jarvis" oppure "Voce del browser" (quella di prima, con tono regolabile).
+- **Non è la voce del Jarvis dei film.** Quella è la voce dell'attore Paul Bettany: copiarla con un modello "clonato" significa imitare una persona reale senza il suo consenso, quindi non l'ho usata.
+
+**Risposte.**
+- Domande **a voce** (pulsante **Mic**, oppure "Jarvis attivazione" + comando sul PC server) → risposta **a voce** (e anche scritta).
+- Domande **scritte** (barra comandi, moduli) → risposta **solo scritta**, senza parlare. Se non sei nella sezione Centrale, compare in una notifica.
+- Rapporto, promemoria, riepilogo e pulsanti **Leggi** usano sempre la voce.
+
+## Fase 19 – Foto e video
+
+Sezione **Media** del pannello:
+1. Scrivi una **descrizione** (almeno due parole, es. "targa della moto", "lavagna di fisica 26/11").
+2. Poi scegli come aggiungere:
+   - **Scegli file**: foto (jpg, png, webp, gif, heic, max 25 MB) o video (mp4, webm, mov, max 200 MB);
+   - **Scatta foto (telefono)** / **Registra video (telefono)**: apre direttamente la fotocamera del telefono;
+   - **Fotocamera / webcam**: anteprima live con **Scatta** e **Registra video** (sul PC con webcam e sul telefono). Funziona solo da `localhost` o da un indirizzo **https** (es. Tailscale, Fase 20); da un indirizzo `http://192.168...` il browser la blocca, ma i due pulsanti "(telefono)" funzionano lo stesso.
+3. Nella **Galleria** ogni file ha i pulsanti **WhatsApp** (invia a una chat; oltre 16 MB viene mandato come documento), **Scarica**, **Elimina**.
+4. Comandi: `mostrami la foto della targa` (cerca nelle descrizioni con la regola del 90%), `mostra la galleria`.
+
+I file restano sul PC server in `C:\Jarvis\dati\media`.
+
+## Fase 20 – App sul telefono
+
+Jarvis si installa sul telefono come un'**app** (icona nella schermata Home, apertura a schermo intero). Non è un file .apk: è un'app web installabile, ed è il modo gratuito per averla sia su Android sia su iPhone. **Funziona solo se il PC server è acceso**, perché tutte le funzioni girano lì.
+
+**Metodo consigliato (funziona anche fuori casa, con https):**
+1. Installa **Tailscale** sul server e sul telefono, con lo stesso account (Fase 14).
+2. Sul server, nel Prompt dei comandi: `tailscale serve --bg 8080`. La prima volta può chiederti di abilitare HTTPS nel pannello di Tailscale: apri il link e conferma. Tailscale mostra un indirizzo tipo `https://nome-pc.tuo-nome.ts.net`, visibile **solo** dai tuoi dispositivi.
+3. In `config.py`:
+   - `ACCESSO_REMOTO = True`;
+   - `PASSWORD_PANNELLO` di almeno 12 caratteri;
+   - `INDIRIZZO_TELEFONO = "https://nome-pc.tuo-nome.ts.net"`.
+   Poi riavvia `avvia_server_jarvis.bat`.
+4. Sul PC: pannello → **Impostazioni → App per telefono** → compare un **codice QR**. Inquadralo con la fotocamera del telefono.
+5. Installa:
+   - **Android (Chrome):** menu **⋮** → **Installa app** (oppure "Aggiungi a schermata Home"). Se compare il pulsante **Installa Jarvis su questo dispositivo** nelle Impostazioni, puoi usare quello.
+   - **iPhone (Safari):** pulsante **Condividi** → **Aggiungi alla schermata Home**.
+6. Apri l'app dall'icona **Jarvis** e fai l'accesso con la password.
+
+**Solo in casa (senza Tailscale):** `HOST_PANNELLO = "0.0.0.0"` + password. Nel QR compare `http://IP-DEL-SERVER:8080`. Su Android diventa un collegamento nella Home invece di un'app completa (serve https per l'installazione vera), e la webcam live non funziona; tutto il resto sì.
+
+Con il server spento, l'app mostra *"Server non raggiungibile"* con il pulsante **Riprova**.
+
 ## Il manuale di meccanica
 
 - **Titolo:** *La Vettura Automobile – Sue parti, suo funzionamento*

@@ -7,6 +7,11 @@
 <title>J.A.R.V.I.S.</title>
 <link rel="manifest" href="/web/manifest.json">
 <link rel="icon" href="/web/icona.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/web/icona-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Jarvis">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="/web/style.css">
@@ -48,6 +53,7 @@
   <button data-sezione="teams">Teams</button>
   <button data-sezione="msi">Msi</button>
   <button data-sezione="meccanica">Meccanica</button>
+  <button data-sezione="media">Media</button>
   <button data-sezione="memoria">Memoria</button>
   <button data-sezione="impostazioni">Impostazioni</button>
 </nav>
@@ -186,6 +192,39 @@
     </div>
   </section>
 
+  <!-- MEDIA: foto e video -->
+  <section id="media" class="sezione">
+    <div class="pannello">
+      <h2>Aggiungi foto o video</h2>
+      <p class="nota">Carica un file oppure scatta/registra ora. La <strong>descrizione</strong> serve a ritrovarlo: "mostrami la foto della targa".</p>
+      <input id="descr-media" class="campo largo-pieno" placeholder="Descrizione (es. targa della moto, lavagna di fisica)" autocomplete="off">
+      <div class="azioni">
+        <label class="btn" for="file-media">Scegli file</label>
+        <input id="file-media" type="file" accept="image/*,video/*" hidden>
+        <label class="btn sec" for="foto-ora">Scatta foto (telefono)</label>
+        <input id="foto-ora" type="file" accept="image/*" capture="environment" hidden>
+        <label class="btn sec" for="video-ora">Registra video (telefono)</label>
+        <input id="video-ora" type="file" accept="video/*" capture="environment" hidden>
+        <button class="btn sec" id="btn-webcam">Fotocamera / webcam</button>
+      </div>
+      <div id="webcam-zona" class="webcam" hidden>
+        <video id="webcam-video" autoplay playsinline muted></video>
+        <div class="azioni">
+          <button class="btn" id="btn-scatta">Scatta</button>
+          <button class="btn sec" id="btn-registra">Registra video</button>
+          <button class="btn sec" id="btn-gira">Cambia fotocamera</button>
+          <button class="btn pericolo" id="btn-chiudi-webcam">Chiudi</button>
+        </div>
+      </div>
+      <div id="stato-media" class="nota"></div>
+    </div>
+    <div class="pannello">
+      <h2>Galleria</h2>
+      <input id="cerca-media" class="campo largo-pieno" placeholder="Cerca nella descrizione..." autocomplete="off">
+      <div id="galleria" class="galleria"></div>
+    </div>
+  </section>
+
   <!-- MEMORIA: cio' che Jarvis impara -->
   <section id="memoria" class="sezione">
     <div class="pannello">
@@ -239,13 +278,23 @@
     </div>
     <div class="pannello">
       <h2>Voce</h2>
-      <label class="riga">Voce <select id="sel-voce" class="campo"></select></label>
+      <label class="riga">Motore <select id="sel-motore" class="campo">
+        <option value="server">Voce di Jarvis (Piper, dal server)</option>
+        <option value="browser">Voce del browser / di Windows</option>
+      </select></label>
+      <p class="nota">Jarvis risponde <strong>a voce</strong> alle domande fatte a voce (Mic, "Jarvis attivazione") e <strong>per iscritto</strong> a quelle scritte. Rapporto, promemoria e pulsanti "Leggi" usano sempre la voce.</p>
+      <label class="riga">Voce browser <select id="sel-voce" class="campo"></select></label>
       <label class="riga">Tono <input type="range" id="tono" min="0.1" max="2" step="0.05"></label>
       <label class="riga">Velocit&agrave; <input type="range" id="velocita" min="0.5" max="1.5" step="0.05"></label>
       <label class="interruttore"><input type="checkbox" id="chk-saggio"><span>Parlata da saggio maestro</span></label>
       <label class="interruttore"><input type="checkbox" id="chk-voce"><span>Voce attiva</span></label>
       <div class="azioni"><button class="btn" id="btn-prova-voce">Prova voce</button></div>
       <p class="nota">Per l'effetto "vecchio maestro" scegli una voce italiana non "Natural" (es. Microsoft Elsa o Cosimo): le voci "Natural" ignorano il tono.</p>
+    </div>
+    <div class="pannello">
+      <h2>App per telefono</h2>
+      <div id="telefono-zona" class="nota">...</div>
+      <div class="azioni"><button class="btn" id="btn-installa" hidden>Installa Jarvis su questo dispositivo</button></div>
     </div>
     <div class="pannello">
       <h2>Registro attività</h2>
@@ -272,6 +321,19 @@
 
 <div id="notifiche" class="notifiche" aria-live="polite"></div>
 <div class="sblocca" id="sblocca" hidden>Tocca lo schermo per attivare la voce di Jarvis</div>
+
+<dialog id="dlg-media" class="dialogo">
+  <form method="dialog">
+    <h2>Invia su WhatsApp</h2>
+    <input id="cerca-dest-media" class="campo" placeholder="Cerca chat...">
+    <div id="lista-dest-media" class="lista compatta"></div>
+    <input id="didascalia-media" class="campo" placeholder="Didascalia (facoltativa)">
+    <div class="azioni">
+      <button class="btn sec" value="annulla">Annulla</button>
+      <button class="btn" value="ok">Invia</button>
+    </div>
+  </form>
+</dialog>
 
 <dialog id="dlg-inoltra" class="dialogo">
   <form method="dialog">
