@@ -91,10 +91,35 @@ function rispostaAutoAttiva(chatId) {
 let qrAttuale = null;
 let pronto = false;
 
+// Browser: quello scaricato da npm install; se manca, Chrome o Edge gia' installati su Windows.
+function browserDiSistema() {
+  const candidati = [
+    process.env.PROGRAMFILES && path.join(process.env.PROGRAMFILES, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+    process.env['PROGRAMFILES(X86)'] && path.join(process.env['PROGRAMFILES(X86)'], 'Google', 'Chrome', 'Application', 'chrome.exe'),
+    process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+    process.env['PROGRAMFILES(X86)'] && path.join(process.env['PROGRAMFILES(X86)'], 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+    process.env.PROGRAMFILES && path.join(process.env.PROGRAMFILES, 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+  ].filter(Boolean);
+  return candidati.find((f) => fs.existsSync(f));
+}
+let opzioniBrowser = { headless: true, args: ['--no-sandbox'] };
+try {
+  const interno = require('puppeteer').executablePath();
+  if (!interno || !fs.existsSync(interno)) throw new Error('browser interno assente');
+} catch {
+  const sistema = browserDiSistema();
+  if (sistema) {
+    log('Browser interno non trovato: uso ' + sistema);
+    opzioniBrowser = { ...opzioniBrowser, executablePath: sistema };
+  }
+}
+
 const client = new Client({
   authStrategy: new LocalAuth({ dataPath: path.join(__dirname, 'sessione') }),
-  puppeteer: { headless: true, args: ['--no-sandbox'] },
+  puppeteer: opzioniBrowser,
 });
+client.on('loading_screen', (perc) => log(`Caricamento WhatsApp: ${perc}%`));
+client.on('authenticated', () => log('Accesso riuscito, sincronizzazione in corso...'));
 
 client.on('qr', (qr) => {
   qrAttuale = qr;
@@ -422,5 +447,14 @@ http
   })
   .listen(PORTA, '127.0.0.1', () => log(`API WhatsApp su http://127.0.0.1:${PORTA}`));
 
-log('Avvio del servizio WhatsApp...');
-client.initialize();
+log('Avvio del servizio WhatsApp (fino a 1-2 minuti la prima volta)...');
+client.initialize().catch((e) => {
+  log('ERRORE all\'avvio di WhatsApp: ' + (e && e.message ? e.message : e));
+  const m = String(e && e.message);
+  if (/Could not find|executable|Failed to launch|ENOENT/i.test(m)) {
+    log('Causa probabile: browser mancante. Rilancia installa_whatsapp.bat (serve spazio su disco) oppure installa Google Chrome.');
+  } else if (/lock|already running|in use/i.test(m)) {
+    log('Causa probabile: un altro servizio WhatsApp e\' gia\' aperto. Chiudi tutte le finestre JARVIS e riavvia.');
+  }
+  setTimeout(() => process.exit(1), 2000); // il file .bat lo riavvia
+});
