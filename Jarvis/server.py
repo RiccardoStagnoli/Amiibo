@@ -8,6 +8,7 @@ Collega: WhatsApp, Google (Gmail/Calendario/Drive), Teams, PC Msi, meccanica.
 
 import json
 import os
+import re
 import secrets
 import sys
 import threading
@@ -588,8 +589,23 @@ def _a_me(testo):
 def pianificatore():
     """Ogni 20 secondi: promemoria scaduti, fine non disturbare, riepilogo quotidiano."""
     ultimo_riepilogo = None
+    ultimo_controllo_compiti = 0.0
     while True:
         try:
+            minuti = getattr(config, "COMPITI_OGNI_MINUTI", 15)
+            if minuti and time.time() - ultimo_controllo_compiti > minuti * 60:
+                ultimo_controllo_compiti = time.time()
+                import compiti
+                import teams_reader
+
+                if teams_reader.configurato() or os.path.exists(os.path.join(CARTELLA, "token.json")):
+                    nuove, _ = compiti.scansiona()
+                    for b in nuove:
+                        testo = (f"Nuova richiesta di esercizi da {b['da']}: {len(b['esercizi'])} esercizi, "
+                                 f"{'su foglio' if b['tipo'] == 'foglio' else 'da consegnare in digitale'}. "
+                                 "Bozza pronta nella sezione Compiti.")
+                        annuncia(testo, azione_pannello="compiti")
+                        _a_me("📚 " + testo)
             for p in extra.promemoria_scaduti():
                 annuncia("Promemoria: " + p["testo"])
                 extra.registra("promemoria", p["testo"])
@@ -765,6 +781,57 @@ def api_media_invia():
     except RuntimeError as e:
         return jsonify(errore=str(e)), 503
     return jsonify(r)
+
+
+# ================================ COMPITI ================================
+@app.route("/api/compiti")
+@richiede_accesso
+def api_compiti():
+    import compiti
+
+    tutte = compiti.bozze(tutte=True)
+    return jsonify(sorted(tutte, key=lambda b: b["creata"], reverse=True)[:40])
+
+
+@app.route("/api/compiti/scansiona", methods=["POST"])
+@richiede_accesso
+def api_compiti_scansiona():
+    import compiti
+
+    nuove, avvisi = compiti.scansiona()
+    return jsonify(nuove=len(nuove), avvisi=avvisi)
+
+
+@app.route("/api/compiti/<azione>", methods=["POST"])
+@richiede_accesso
+def api_compiti_azione(azione):
+    import compiti
+
+    d = request.get_json(silent=True) or {}
+    b = compiti.trova(str(d.get("id", "")))
+    if not b:
+        return jsonify(errore="Bozza non trovata."), 404
+    if azione == "mostrata":
+        compiti.segna_mostrata(b["id"])
+    elif azione == "modifica":
+        compiti.modifica_risposta(b["id"], str(d.get("risposta", "")))
+    elif azione == "scarta":
+        compiti.scarta(b["id"])
+    elif azione == "invia":
+        # conferma esplicita: l'utente deve scrivere/dire "manda esercizio"
+        if re.sub(r"\s+", " ", str(d.get("conferma", "")).strip().lower()) not in ("manda esercizio", "manda l'esercizio"):
+            return jsonify(errore=errore_utente("Per inviare devi scrivere esattamente: manda esercizio.")), 400
+        try:
+            dove = compiti.invia(b["id"])
+        except ValueError as e:
+            return jsonify(errore=str(e)), 400
+        except Exception as e:
+            return jsonify(errore=f"Invio non riuscito: {e}"), 502
+        extra.registra("compiti", f"inviato: {b['titolo']} -> {dove}", request.remote_addr)
+        return jsonify(ok=True, dove=dove)
+    else:
+        abort(404)
+    return jsonify(ok=True)
 
 
 # ============================ SCRITTURA A MANO ============================

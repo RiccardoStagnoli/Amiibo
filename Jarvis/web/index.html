@@ -50,6 +50,7 @@
   <button data-sezione="centrale" class="attivo">Centrale</button>
   <button data-sezione="whatsapp">WhatsApp</button>
   <button data-sezione="gmail">Google</button>
+  <button data-sezione="compiti">Compiti</button>
   <button data-sezione="teams">Teams</button>
   <button data-sezione="msi">Msi</button>
   <button data-sezione="github">GitHub</button>
@@ -149,6 +150,16 @@
         <button class="btn pericolo" data-azione="cestina">Sposta nel cestino</button>
       </div>
       <div class="azioni"><button class="btn piccolo pericolo" id="btn-svuota">Svuota cestino Gmail (definitivo)</button></div>
+    </div>
+  </section>
+
+  <!-- COMPITI -->
+  <section id="compiti" class="sezione">
+    <div class="pannello">
+      <h2>Compiti dai professori</h2>
+      <p class="nota">Jarvis controlla Teams e la posta. Quando un professore chiede esercizi prepara una bozza: soluzioni con i passaggi, cosa fare e consigli. <strong>Non invia niente da solo</strong>: prima la vedi, poi devi scrivere o dire chiaramente "manda esercizio".</p>
+      <div class="azioni"><button class="btn" id="btn-controlla-compiti">Controlla ora Teams e posta</button></div>
+      <div id="lista-compiti" class="lista lista-alta"></div>
     </div>
   </section>
 

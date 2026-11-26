@@ -262,3 +262,27 @@ def aggiungi_evento_rapido(testo):
     e = _servizio("calendar", "v3").events().quickAdd(calendarId="primary", text=testo).execute()
     return {"titolo": e.get("summary"), "inizio": e.get("start", {}).get("dateTime") or e.get("start", {}).get("date"),
             "link": e.get("htmlLink")}
+
+
+def invia_risposta(id_messaggio, testo):
+    """Risponde a un'email (stessa conversazione) con un testo semplice."""
+    from email.mime.text import MIMEText
+
+    srv = _servizio()
+    m = srv.users().messages().get(userId="me", id=id_messaggio, format="metadata",
+                                   metadataHeaders=["From", "Reply-To", "Subject", "Message-ID", "References"]).execute()
+    h = m.get("payload", {}).get("headers", [])
+    destinatario = _intestazione(h, "Reply-To") or _intestazione(h, "From")
+    oggetto = _intestazione(h, "Subject")
+    if not oggetto.lower().startswith("re:"):
+        oggetto = "Re: " + oggetto
+    msg = MIMEText(testo, "plain", "utf-8")
+    msg["To"] = destinatario
+    msg["Subject"] = oggetto
+    mid = _intestazione(h, "Message-ID")
+    if mid:
+        msg["In-Reply-To"] = mid
+        msg["References"] = (_intestazione(h, "References") + " " + mid).strip()
+    grezzo = base64.urlsafe_b64encode(msg.as_bytes()).decode("ascii")
+    srv.users().messages().send(userId="me", body={"raw": grezzo, "threadId": m.get("threadId")}).execute()
+    return destinatario

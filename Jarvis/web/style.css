@@ -322,3 +322,14 @@ a.btn { text-decoration: none; text-align: center; }
 .parola-letta input { width: 9em; }
 .parola-letta .sotto { font-size: 0.75rem; }
 .a-capo { flex-basis: 100%; height: 0; }
+
+/* Compiti */
+.lista-alta { max-height: none; }
+.compito .compito-dettagli { margin-top: 8px; }
+.compito ul, .compito ol { margin: 4px 0 8px 18px; padding: 0; }
+.citazione-prof { border-left: 3px solid var(--acc); padding: 6px 10px; color: var(--testo-2); white-space: pre-wrap; }
+.esercizio { border-top: 1px dashed var(--bordo); padding: 8px 0; }
+.consigli { margin-top: 6px; color: var(--acc-2); }
+.compito details { margin-top: 6px; }
+.compito summary { cursor: pointer; color: var(--secondo); }
+.compito-risposta { min-height: 200px; white-space: pre-wrap; }

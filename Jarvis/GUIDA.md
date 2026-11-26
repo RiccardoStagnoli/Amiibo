@@ -525,6 +525,30 @@ Una calligrafia vera **non l'ho potuta provare**.
 
 Il pulsante **Esegui come comando** manda il testo letto a Jarvis, come se lo avessi scritto nella barra.
 
+## Fase 25 – Compiti dai professori (Teams e posta)
+
+Jarvis controlla ogni 15 minuti (`COMPITI_OGNI_MINUTI`) le chat di Teams, i compiti di Teams, la posta della scuola e Gmail. Quando un professore chiede degli esercizi:
+1. ti avvisa (a voce, nel pannello e con un WhatsApp a te stesso) e crea una **bozza** nella sezione **Compiti**;
+2. per ogni esercizio prepara **soluzione con i passaggi** (quelli che sa risolvere, Fase 23), **consigli** (formule, metodo, errori da evitare) e **cosa devi fare** (scadenza, pagine del libro, consegna);
+3. se è un esercizio **su foglio/quaderno** te lo spiega e ti dà i consigli; la soluzione è nascosta sotto "Soluzione per controllo", così puoi farlo tu e poi verificare;
+4. se è da consegnare **in digitale** (chat di Teams, email) prepara la risposta, che puoi modificare.
+
+**Niente viene inviato da solo.** Per inviare:
+- prima devi **vedere** la bozza: `mostra esercizio 1` oppure "Vedi bozza" nel pannello. Senza questo passaggio Jarvis rifiuta;
+- poi devi dire o scrivere chiaramente **`manda esercizio 1`**. Nel pannello, il pulsante "Manda esercizio" chiede di scrivere esattamente "manda esercizio".
+
+I compiti di **Teams (Assignments)** non si possono consegnare da Jarvis: apri il link "Apri su Teams" e carica la foto o il file.
+
+Comandi: `controlla i compiti`, `compiti`, `mostra esercizio 1`, `consigli 1`, `manda esercizio 1`, `scarta esercizio 1`.
+
+**Impostazioni** (`config.py`):
+- `COMPITI_MITTENTI = ["scuola.edu.it"]`: domini o indirizzi dei professori su Gmail.
+- `TEAMS_POSTA_SCUOLA = True`: posta della scuola (Outlook).
+- `TEAMS_LEGGI_COMPITI = True`: compiti di Teams. *Dati insufficienti per verificare* se la tua scuola concede questi permessi: se dopo averli attivati `accedi_teams.bat` dà errore di approvazione, rimettili a `False`.
+- Dopo aver cambiato queste impostazioni esegui di nuovo `accedi_teams.bat`: Jarvis ora chiede anche il permesso di scrivere nelle chat (per "manda esercizio").
+
+**Nota:** consegnare come proprio un lavoro preparato da Jarvis può essere contro le regole della scuola. Usa soluzioni e consigli per capire e verificare.
+
 ## Il manuale di meccanica
 
 - **Titolo:** *La Vettura Automobile – Sue parti, suo funzionamento*

@@ -29,6 +29,7 @@ def risposta(testo, esito="ok", **extra):
 
 AIUTO = (
     "Comandi: 'apri chrome e cerca ...', 'cerca su youtube ...', 'apri steam e scarica ...', "
+    "Compiti: 'controlla i compiti', 'compiti', 'mostra esercizio 1', 'manda esercizio 1', 'consigli 1'. "
     "Esercizi: 'risolvi x^2-5x+6=0', 'deriva ...', 'integra ... da 0 a 3', 'converti 120 km/h in m/s', "
     "oppure il testo dell'esercizio con dati e unità (es. 'un'auto accelera a 2 m/s² per 10 s, che velocità raggiunge?'). "
     "GitHub: 'github', 'i miei repository', 'pull request', 'stato build <repo>', 'crea issue su <repo>: ...', "
@@ -158,6 +159,14 @@ class Interprete:
             (r"^(non disturbare|modalita non disturbare)( per (?P<n>\S+) (?P<u>or[ae]|minuti))?$", self.non_disturbare),
             (r"^(fine|basta|disattiva) (non disturbare|modalita non disturbare)$", lambda m: self.s["fine_non_disturbare"]()),
             (r"^(riepilogo|briefing)( (di oggi|giornaliero))?$", lambda m: risposta(self.s["riepilogo"]())),
+            # --- Compiti dai professori (bozze: si inviano SOLO con "manda esercizio") ---
+            (r"^(controlla|guarda|cerca) (i )?(compiti|esercizi)( nuovi)?$|^controlla teams e (la )?posta$|^ci sono (nuovi )?(esercizi|compiti)$",
+             lambda m: self.compiti_scansiona()),
+            (r"^(i )?(miei )?compiti$|^(gli )?esercizi da fare$|^(le )?bozze( degli esercizi)?$", lambda m: self.compiti_elenco()),
+            (r"^mostra(mi)? (l'|il )?(esercizio|compito|bozza)( (?P<n>\d{1,3}))?$", lambda m: self.compiti_mostra(m["n"])),
+            (r"^manda (l'|il )?(esercizio|compito)( (?P<n>\d{1,3}))?$", lambda m: self.compiti_manda(m["n"])),
+            (r"^(scarta|annulla|elimina) (l'|il )?(esercizio|compito|bozza) (?P<n>\d{1,3})$", lambda m: self.compiti_scarta(m["n"])),
+            (r"^consigli( per)?( l')?( esercizio| compito)?( (?P<n>\d{1,3}))?$", lambda m: self.compiti_consigli(m["n"])),
             # --- Esercizi (matematica, fisica, meccanica, tecnologia) ---
             (r"^(esercizio|problema|risolvi l'esercizio)[:,]? (?P<q>.+)$", lambda m: self.esercizio(m["q"])),
             (r"^(?P<q>(risolvi|equazione|sistema|deriva|derivata|integra|integrale|limite|semplifica|scomponi|espandi|converti|calcola)\b.+)$", lambda m: self.esercizio(m["q"])),
@@ -567,3 +576,91 @@ class Interprete:
         passi = "\n".join(f"{i}. {p}" for i, p in enumerate(r["passi"], 1))
         return risposta(f"Risultato: {r['risultato']}" + (f"\n\nPassaggi:\n{passi}" if passi else ""), "ok",
                         esercizio=r)
+
+    # ------------------------------ Compiti ------------------------------
+    def _bozza(self, n):
+        import compiti
+
+        lista = compiti.bozze()
+        if not lista:
+            return None, risposta("Nessun esercizio in attesa.")
+        if n is None:
+            if len(lista) > 1:
+                return None, risposta(f"Ci sono {len(lista)} bozze: dimmi quale, es. 'mostra esercizio 1'. "
+                                      + "; ".join(f"{i}) {b['da']} – {b['titolo']}" for i, b in enumerate(lista, 1)), "incerto")
+            return lista[0], None
+        b = compiti.trova(int(n))
+        if not b:
+            return None, risposta(errore_utente(f"Non c'è nessuna bozza numero {n}. Ce ne sono {len(lista)}."), "errore_utente")
+        return b, None
+
+    def compiti_scansiona(self):
+        import compiti
+
+        nuove, avvisi = compiti.scansiona()
+        testo = (f"Trovate {len(nuove)} nuove richieste di esercizi." if nuove else "Nessuna nuova richiesta di esercizi.")
+        tot = len(compiti.bozze())
+        if tot:
+            testo += f" Bozze da rivedere: {tot}. Di' 'mostra esercizio 1'."
+        if avvisi:
+            testo += " " + " ".join(avvisi)
+        return risposta(testo, azione_pannello="compiti" if tot else None)
+
+    def compiti_elenco(self):
+        import compiti
+
+        lista = compiti.bozze()
+        if not lista:
+            return risposta("Nessun esercizio in attesa.")
+        return risposta("Bozze: " + "; ".join(
+            f"{i}) {b['da']} – {b['titolo']} ({'su foglio' if b['tipo'] == 'foglio' else 'da inviare'}"
+            f"{', già vista' if b['mostrato'] else ''})" for i, b in enumerate(lista, 1)) + ".", azione_pannello="compiti")
+
+    def compiti_mostra(self, n):
+        import compiti
+
+        b, errore = self._bozza(n)
+        if errore:
+            return errore
+        compiti.segna_mostrata(b["id"])
+        righe = [f"Da {b['da']} ({b['titolo']}). Tipo: {'esercizi su foglio' if b['tipo'] == 'foglio' else 'consegna digitale'}.",
+                 "Cosa fare: " + " ".join(b["cosa_fare"])]
+        if b["tipo"] == "foglio":
+            for i, e in enumerate(b["esercizi"], 1):
+                righe.append(f"Esercizio {i}: {e['testo']}\n  Consigli: " + " ".join(e["consigli"][:3])
+                             + (f"\n  Risultato per controllo: {e['risultato']}" if e["risolto"] else ""))
+        else:
+            righe.append("Risposta pronta:\n" + b["risposta"])
+        if b["fonte"] in ("teams_chat", "gmail", "posta_scuola"):
+            righe.append("Per inviarla di' chiaramente: 'manda esercizio" + (f" {n}" if n else "") + "'.")
+        return risposta("\n".join(righe), azione_pannello="compiti", bozza=b["id"])
+
+    def compiti_manda(self, n):
+        import compiti
+
+        b, errore = self._bozza(n)
+        if errore:
+            return errore
+        try:
+            dove = compiti.invia(b["id"])
+        except ValueError as e:
+            return risposta(str(e), "incerto")
+        except Exception as e:
+            return risposta(f"Invio non riuscito: {e}", "errore")
+        return risposta(f"Esercizio inviato: {dove}.")
+
+    def compiti_scarta(self, n):
+        import compiti
+
+        b, errore = self._bozza(n)
+        if errore:
+            return errore
+        compiti.scarta(b["id"])
+        return risposta("Bozza scartata.")
+
+    def compiti_consigli(self, n):
+        b, errore = self._bozza(n)
+        if errore:
+            return errore
+        righe = [f"Esercizio {i}: " + " ".join(e["consigli"]) for i, e in enumerate(b["esercizi"], 1)]
+        return risposta("\n".join(righe) or "Nessun esercizio individuato nel messaggio.")

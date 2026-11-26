@@ -102,3 +102,14 @@ VELOCITA_PIPER = 1.0
 # Indirizzo da aprire sul telefono (mostrato come QR in Impostazioni), es. l'indirizzo
 # https://....ts.net di Tailscale. Vuoto = Jarvis prova a ricavare l'IP di rete del server.
 INDIRIZZO_TELEFONO = ""
+
+# ------------------------- COMPITI DAI PROFESSORI (GUIDA, Fase 25) -------------------------
+# Leggere i compiti di Teams (Assignments): permesso EduAssignments.ReadBasic, potrebbe servire l'ok della scuola.
+TEAMS_LEGGI_COMPITI = False
+# Leggere e rispondere alla posta della scuola (Outlook/Microsoft 365): permessi Mail.Read e Mail.Send.
+TEAMS_POSTA_SCUOLA = False
+# Indirizzi o domini dei professori su Gmail (es. "scuola.edu.it"). Vuoto = Jarvis usa solo
+# le email con "esercizi"/"compiti" nell'oggetto.
+COMPITI_MITTENTI = []
+# Ogni quanti minuti controllare Teams e la posta. 0 = mai in automatico.
+COMPITI_OGNI_MINUTI = 15

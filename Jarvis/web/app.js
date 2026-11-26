@@ -328,6 +328,7 @@ function mostraSezione(nome) {
   if (nome === 'memoria') caricaMemoria();
   if (nome === 'media') caricaMedia();
   if (nome === 'github') caricaGitHub();
+  if (nome === 'compiti') caricaCompiti();
   if (nome === 'scrittura') { preparaLavagna(); statoScrittura(); }
 }
 
@@ -358,6 +359,7 @@ function gestisciRisposta(r, voce = false) {
   if (r.azione_pannello === 'rapporto') rapporto(false);
   if (r.azione_pannello === 'pulizia') { mostraSezione('gmail'); analizzaPosta(); }
   if (r.azione_pannello === 'scrittura') mostraSezione('scrittura');
+  if (r.azione_pannello === 'compiti') mostraSezione('compiti');
   if (r.azione_pannello === 'media') { mostraSezione('media'); evidenziaMedia(r.media || []); }
   if (r.fonti && r.fonti.length) mostraParlato(r.testo + '\nFonti: ' + r.fonti.map((f) => `${f.manuale} (${f.sezione})`).join(', '));
 }
@@ -579,6 +581,11 @@ async function rapporto(conSaluto = true) {
         parla(n.length ? `GitHub: ${n.length} notifiche. ` + n.slice(0, 4).map((x) => `${x.repo.split('/')[1]}: ${x.titolo}`).join('; ') : 'GitHub: nessuna notifica.');
       }
     } catch { /* GitHub non collegato */ }
+
+    try {
+      const c = (await api('/api/compiti')).filter((b) => b.stato === 'da_rivedere');
+      if (c.length) parla(`Compiti: ${c.length} richieste di esercizi con la bozza pronta. ` + c.slice(0, 3).map((b) => `${b.da}: ${b.esercizi.length} esercizi ${b.tipo === 'foglio' ? 'su foglio' : 'da inviare'}`).join('; '));
+    } catch { /* niente */ }
 
     const ev = await aggiornaAgenda();
     if (ev) {
@@ -984,6 +991,81 @@ $('#form-documento').addEventListener('submit', async (e) => {
     $('#file-documento').value = '';
     caricaMemoria();
   } catch (err) { scrivi(err.message, true); suono('errore'); }
+});
+
+// =========================================================================
+// COMPITI (bozze: si inviano solo scrivendo/dicendo "manda esercizio")
+// =========================================================================
+async function caricaCompiti() {
+  const box = $('#lista-compiti');
+  try {
+    const lista = await api('/api/compiti');
+    const attive = lista.filter((b) => b.stato === 'da_rivedere');
+    const altre = lista.filter((b) => b.stato !== 'da_rivedere').slice(0, 10);
+    if (!lista.length) { box.replaceChildren(el('p', { class: 'nota' }, 'Nessuna richiesta di esercizi trovata.')); return; }
+    box.replaceChildren(...attive.map((b, i) => schedaCompito(b, i + 1)),
+      altre.length ? el('h3', {}, 'Già gestite') : null,
+      ...altre.map((b) => el('div', { class: 'voce' },
+        el('div', { class: 'titolo' }, el('span', {}, `${b.da} – ${b.titolo}`), el('span', { class: 'sotto' }, b.stato === 'inviata' ? 'inviata ' + dataOra(b.inviata) : b.stato)))));
+  } catch (e) { box.replaceChildren(el('p', { class: 'errore' }, e.message)); }
+}
+
+function schedaCompito(b, numero) {
+  const inviabile = ['teams_chat', 'gmail', 'posta_scuola'].includes(b.fonte);
+  const area = el('textarea', { class: 'campo editor compito-risposta' });
+  area.value = b.risposta;
+  const dettagli = el('div', { class: 'compito-dettagli', hidden: !b.mostrato },
+    el('h3', {}, 'Cosa devi fare'),
+    el('ul', {}, ...b.cosa_fare.map((x) => el('li', {}, x))),
+    el('h3', {}, 'Messaggio del professore'),
+    el('div', { class: 'citazione-prof' }, b.testo),
+    ...b.esercizi.map((e, i) => el('div', { class: 'esercizio' },
+      el('strong', {}, `Esercizio ${i + 1}`), el('div', {}, e.testo),
+      el('div', { class: 'consigli' }, el('em', {}, 'Consigli: '), el('ul', {}, ...e.consigli.map((c) => el('li', {}, c)))),
+      e.risolto ? el('details', {}, el('summary', {}, 'Soluzione per controllo'),
+        el('ol', {}, ...e.passi.map((p) => el('li', {}, p))), el('strong', {}, e.risultato))
+        : el('div', { class: 'sotto' }, 'Non risolto in automatico: segui i consigli o scrivimi il testo completo.'))),
+    inviabile ? el('h3', {}, 'Risposta da inviare (puoi modificarla)') : null,
+    inviabile ? area : el('p', { class: 'nota' }, b.fonte === 'teams_compito'
+      ? 'Compito di Teams: si consegna dall\'app Teams (apri il link) caricando la foto o il file.' : ''),
+    el('div', { class: 'azioni' },
+      inviabile ? el('button', {
+        class: 'btn',
+        onclick: async () => {
+          if (area.value !== b.risposta) await api('/api/compiti/modifica', { id: b.id, risposta: area.value });
+          const conferma = prompt('Per inviare scrivi esattamente: manda esercizio');
+          if (conferma === null) return;
+          try {
+            const r = await api('/api/compiti/invia', { id: b.id, conferma });
+            scrivi(`Esercizio inviato: ${r.dove}.`); caricaCompiti();
+          } catch (e) { scrivi(e.message, true); suono('errore'); }
+        },
+      }, 'Manda esercizio') : null,
+      b.url ? el('a', { class: 'btn sec', href: b.url, target: '_blank', rel: 'noopener' }, 'Apri su Teams') : null,
+      el('button', { class: 'btn sec', onclick: () => parla(`Esercizio ${numero}. ${b.cosa_fare.join(' ')} ` + b.esercizi.map((e, i) => `Esercizio ${i + 1}: ${e.testo}. ${e.consigli[0] || ''}`).join(' ')) }, 'Leggimelo'),
+      el('button', { class: 'btn piccolo pericolo', onclick: async () => { if (confirm('Scartare questa bozza?')) { await api('/api/compiti/scarta', { id: b.id }); caricaCompiti(); } } }, 'Scarta')));
+  const vedi = el('button', {
+    class: 'btn piccolo' + (b.mostrato ? ' sec' : ''),
+    onclick: async () => {
+      dettagli.hidden = !dettagli.hidden;
+      if (!b.mostrato) { await api('/api/compiti/mostrata', { id: b.id }); b.mostrato = true; vedi.className = 'btn piccolo sec'; }
+    },
+  }, b.mostrato ? 'Nascondi/mostra' : 'Vedi bozza');
+  return el('div', { class: 'voce nuova compito' },
+    el('div', { class: 'titolo' }, el('span', {}, `${numero}) ${b.da} – ${b.titolo}`),
+      el('span', { class: 'etichetta' }, b.tipo === 'foglio' ? 'SU FOGLIO' : 'DA INVIARE')),
+    el('div', { class: 'sotto' }, `${b.esercizi.length} esercizi · ${dataOra(b.creata)}` + (b.scadenza ? ` · scadenza ${dataOra(b.scadenza)}` : '')),
+    el('div', { class: 'azioni', style: 'margin:6px 0' }, vedi),
+    dettagli);
+}
+
+$('#btn-controlla-compiti').addEventListener('click', async () => {
+  scrivi('Controllo Teams e posta...');
+  try {
+    const r = await api('/api/compiti/scansiona', {});
+    scrivi(r.nuove ? `Trovate ${r.nuove} nuove richieste di esercizi.` : 'Nessuna nuova richiesta.' + (r.avvisi.length ? ' ' + r.avvisi.join(' ') : ''));
+    caricaCompiti();
+  } catch (e) { scrivi(e.message, true); }
 });
 
 // =========================================================================
