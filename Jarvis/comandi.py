@@ -29,6 +29,8 @@ def risposta(testo, esito="ok", **extra):
 
 AIUTO = (
     "Comandi: 'apri chrome e cerca ...', 'cerca su youtube ...', 'apri steam e scarica ...', "
+    "Esercizi: 'risolvi x^2-5x+6=0', 'deriva ...', 'integra ... da 0 a 3', 'converti 120 km/h in m/s', "
+    "oppure il testo dell'esercizio con dati e unità (es. 'un'auto accelera a 2 m/s² per 10 s, che velocità raggiunge?'). "
     "GitHub: 'github', 'i miei repository', 'pull request', 'stato build <repo>', 'crea issue su <repo>: ...', "
     "'leggi il file <percorso> di <repo>', 'cerca su github ...'. "
     "Chrome: 'nuova scheda ...', 'schede', 'passa alla scheda ...', 'chiudi scheda', 'indietro', 'leggi la pagina', "
@@ -85,6 +87,13 @@ class Interprete:
                     return azione(m)
                 except Exception as e:  # errore del sistema, NON dell'utente: niente insulti
                     return risposta(f"Errore del sistema: {e}", "errore")
+
+        # Esercizio scritto a parole con dati e unita' di misura (es. "un'auto accelera a 2 m/s²...")
+        import esercizi
+
+        if esercizi.RX_NUMERO_UNITA.search(esercizi._norm(orig)) and re.search(
+                r"\?|calcola|determina|trova|quanto|quale|=\s*\?", orig.lower()):
+            return self.esercizio(orig)
 
         # Nessun comando: se e' una domanda, cerco nelle mie fonti (manuali, documenti, memoria).
         if originale.rstrip().endswith("?") or re.match(PAROLE_DOMANDA, t):
@@ -149,6 +158,9 @@ class Interprete:
             (r"^(non disturbare|modalita non disturbare)( per (?P<n>\S+) (?P<u>or[ae]|minuti))?$", self.non_disturbare),
             (r"^(fine|basta|disattiva) (non disturbare|modalita non disturbare)$", lambda m: self.s["fine_non_disturbare"]()),
             (r"^(riepilogo|briefing)( (di oggi|giornaliero))?$", lambda m: risposta(self.s["riepilogo"]())),
+            # --- Esercizi (matematica, fisica, meccanica, tecnologia) ---
+            (r"^(esercizio|problema|risolvi l'esercizio)[:,]? (?P<q>.+)$", lambda m: self.esercizio(m["q"])),
+            (r"^(?P<q>(risolvi|equazione|sistema|deriva|derivata|integra|integrale|limite|semplifica|scomponi|espandi|converti|calcola)\b.+)$", lambda m: self.esercizio(m["q"])),
             # --- Foto e video ---
             (r"^(mostra(mi)?|fammi vedere|trova|apri) (la |il |le |i |una |un )?(foto|video|immagine|immagini)( (di|della|del|dello|delle|dei|degli|con|sul|sulla))? (?P<q>.+)$", self.mostra_media),
             (r"^(mostra(mi)?|apri) (le |i )?(mie )?(foto|video|galleria)$", lambda m: risposta("Galleria aperta.", azione_pannello="media")),
@@ -538,3 +550,17 @@ class Interprete:
             r = g.unisci_pr(g.trova_repo(m["r"]), m["n"])
             return f"Pull request {m['n']} unita." if r["unita"] else f"Non unita: {r['messaggio']}"
         return self.gh(f)
+
+    # ------------------------------ Esercizi ------------------------------
+    def esercizio(self, testo):
+        import esercizi
+
+        try:
+            r = esercizi.risolvi_esercizio(testo.strip())
+        except esercizi.ErroreEsercizio as e:
+            return risposta(incerto(str(e)), "incerto")
+        except Exception as e:  # espressione impossibile da calcolare
+            return risposta(f"Calcolo non riuscito: {e}", "errore")
+        passi = "\n".join(f"{i}. {p}" for i, p in enumerate(r["passi"], 1))
+        return risposta(f"Risultato: {r['risultato']}" + (f"\n\nPassaggi:\n{passi}" if passi else ""), "ok",
+                        esercizio=r)
