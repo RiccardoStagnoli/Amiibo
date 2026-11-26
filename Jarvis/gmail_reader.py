@@ -286,3 +286,17 @@ def invia_risposta(id_messaggio, testo):
     grezzo = base64.urlsafe_b64encode(msg.as_bytes()).decode("ascii")
     srv.users().messages().send(userId="me", body={"raw": grezzo, "threadId": m.get("threadId")}).execute()
     return destinatario
+
+
+def eventi_prossimi(giorni=7):
+    """Eventi del calendario da adesso ai prossimi 'giorni' giorni."""
+    from datetime import datetime, timedelta
+
+    adesso = datetime.now().astimezone()
+    r = _servizio("calendar", "v3").events().list(
+        calendarId="primary", timeMin=adesso.isoformat(), timeMax=(adesso + timedelta(days=giorni)).isoformat(),
+        singleEvents=True, orderBy="startTime", maxResults=50,
+    ).execute()
+    return [{"id": e["id"], "titolo": e.get("summary", "(senza titolo)"),
+             "inizio": e.get("start", {}).get("dateTime") or e.get("start", {}).get("date"),
+             "luogo": e.get("location", "")} for e in r.get("items", [])]

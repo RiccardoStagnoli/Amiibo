@@ -333,3 +333,10 @@ a.btn { text-decoration: none; text-align: center; }
 .compito details { margin-top: 6px; }
 .compito summary { cursor: pointer; color: var(--secondo); }
 .compito-risposta { min-height: 200px; white-space: pre-wrap; }
+
+/* Casa e ClasseViva */
+#casa { grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); align-items: start; }
+.cv-form { flex-wrap: wrap; margin-top: 8px; }
+.cv-form .campo { min-width: 180px; }
+.voce.nuovo-agenda { border-left-color: var(--secondo); }
+.badge-nuovo { background: var(--secondo); color: #000; border-radius: 4px; padding: 0 6px; font-size: 0.7rem; margin-right: 6px; }

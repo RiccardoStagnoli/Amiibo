@@ -52,6 +52,7 @@
   <button data-sezione="gmail">Google</button>
   <button data-sezione="compiti">Compiti</button>
   <button data-sezione="teams">Teams</button>
+  <button data-sezione="casa">Casa</button>
   <button data-sezione="msi">Msi</button>
   <button data-sezione="github">GitHub</button>
   <button data-sezione="meccanica">Meccanica</button>
@@ -153,12 +154,55 @@
     </div>
   </section>
 
+  <!-- CASA: Alexa, Spotify, Discord -->
+  <section id="casa" class="sezione">
+    <div class="pannello">
+      <h2>Alexa e dispositivi</h2>
+      <div id="alexa-stato" class="nota">...</div>
+      <form id="form-alexa" class="composer">
+        <input id="alexa-testo" class="campo" placeholder="Es. accendi la luce del salotto, imposta il termostato a 21 gradi" autocomplete="off">
+        <button class="btn" type="submit">Di' ad Alexa</button>
+      </form>
+      <div id="alexa-dispositivi" class="azioni"></div>
+    </div>
+    <div class="pannello">
+      <h2>Musica</h2>
+      <div id="spotify-stato" class="nota">...</div>
+      <form id="form-spotify" class="composer">
+        <input id="spotify-cerca" class="campo" placeholder="Brano, artista o 'playlist ...'" autocomplete="off">
+        <button class="btn" type="submit">Spotify</button>
+      </form>
+      <div class="azioni">
+        <button class="btn sec" data-spotify="canzone precedente">⏮</button>
+        <button class="btn sec" data-spotify="pausa spotify">⏸</button>
+        <button class="btn sec" data-spotify="riprendi spotify">▶</button>
+        <button class="btn sec" data-spotify="prossima canzone">⏭</button>
+      </div>
+      <p class="nota">Amazon Music passa da Alexa: scrivi nella barra "metti jazz su amazon music".</p>
+    </div>
+    <div class="pannello">
+      <h2>Discord</h2>
+      <select id="discord-canale" class="campo"></select>
+      <div id="discord-messaggi" class="lista compatta"></div>
+      <form id="form-discord" class="composer">
+        <input id="discord-testo" class="campo" placeholder="Scrivi nel canale..." autocomplete="off">
+        <button class="btn" type="submit">Invia</button>
+      </form>
+    </div>
+  </section>
+
   <!-- COMPITI -->
   <section id="compiti" class="sezione">
     <div class="pannello">
       <h2>Compiti dai professori</h2>
       <p class="nota">Jarvis controlla Teams e la posta. Quando un professore chiede esercizi prepara una bozza: soluzioni con i passaggi, cosa fare e consigli. <strong>Non invia niente da solo</strong>: prima la vedi, poi devi scrivere o dire chiaramente "manda esercizio".</p>
-      <div class="azioni"><button class="btn" id="btn-controlla-compiti">Controlla ora Teams e posta</button></div>
+      <div class="azioni"><button class="btn" id="btn-controlla-compiti">Controlla ora Teams, ClasseViva e posta</button></div>
+      <form id="form-classeviva" class="composer cv-form" hidden>
+        <input id="cv-utente" class="campo" placeholder="ClasseViva: codice utente o email" autocomplete="username">
+        <input id="cv-password" class="campo" type="password" placeholder="Password ClasseViva" autocomplete="current-password">
+        <button class="btn" type="submit">Collega ClasseViva</button>
+      </form>
+      <p id="cv-collegato" class="nota" hidden>ClasseViva collegato. <button class="btn piccolo sec" id="btn-cv-scollega" type="button">Scollega</button></p>
       <div id="lista-compiti" class="lista lista-alta"></div>
     </div>
   </section>

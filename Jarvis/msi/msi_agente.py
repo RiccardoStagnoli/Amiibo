@@ -162,6 +162,12 @@ def esegui(azione, p):
         return steam_scarica(p["gioco"])
     if azione == "screenshot":
         return screenshot()
+    if azione == "apri_uri":
+        uri = p.get("uri", "")
+        if not uri.startswith(("spotify:", "discord:", "steam:")):
+            return "Indirizzo non permesso."
+        os.startfile(uri)
+        return "Aperto su " + NOME + "."
     if azione == "chrome":
         if not CHROME_CONTROLLO:
             return "Controllo di Chrome disattivato sul PC Msi (CHROME_CONTROLLO = False)."

@@ -466,7 +466,7 @@ def _servizi():
         "eventi_oggi": gmail_reader.eventi_oggi, "evento": gmail_reader.aggiungi_evento_rapido,
         "drive_cerca": gmail_reader.cerca_drive, "teams": teams_reader.nuovi_messaggi,
         "accendi_msi": accendi_msi, "non_disturbare": non_disturbare,
-        "fine_non_disturbare": fine_non_disturbare, "riepilogo": riepilogo,
+        "fine_non_disturbare": fine_non_disturbare, "riepilogo": riepilogo, "alexa": alexa,
     }
 
 
@@ -536,14 +536,21 @@ def riepilogo():
     oggi = time.localtime()
     parti = [f"Riepilogo di {giorni[oggi.tm_wday]} {oggi.tm_mday} {mesi[oggi.tm_mon - 1]}."]
     try:
-        m = meteo()
-        parti.append(f"Meteo {m['citta']}: {m['descrizione']}, da {m['minima']} a {m['massima']} gradi.")
+        import agenda
+
+        nuovi = agenda.nuovi_da_riferire()
+        if nuovi:
+            parti.append("NUOVO IN AGENDA: " + "; ".join(agenda.frase(i) for i in nuovi[:6]) + ".")
+        prossimi, _ = agenda.prossimi(7)
+        if prossimi:
+            parti.append("Prossimi impegni: " + "; ".join(agenda.frase(i) for i in prossimi[:8]) + ".")
+        else:
+            parti.append("Nessun impegno nei prossimi 7 giorni.")
     except Exception:
         pass
     try:
-        ev = gmail_reader.eventi_oggi()
-        parti.append("Agenda: " + ("; ".join(f"{(e['inizio'] or '')[11:16] or 'giornata'} {e['titolo']}" for e in ev)
-                                   if ev else "nessun impegno") + ".")
+        m = meteo()
+        parti.append(f"Meteo {m['citta']}: {m['descrizione']}, da {m['minima']} a {m['massima']} gradi.")
     except Exception:
         pass
     try:
@@ -594,6 +601,15 @@ def pianificatore():
         try:
             minuti = getattr(config, "COMPITI_OGNI_MINUTI", 15)
             if minuti and time.time() - ultimo_controllo_compiti > minuti * 60:
+                import agenda
+
+                try:
+                    for i in agenda.da_notificare():
+                        testo = "Nuovo in agenda: " + agenda.frase(i)
+                        annuncia(testo)
+                        _a_me("🗓️ " + testo)
+                except Exception as e:
+                    print("Agenda:", e)
                 ultimo_controllo_compiti = time.time()
                 import compiti
                 import teams_reader
@@ -781,6 +797,142 @@ def api_media_invia():
     except RuntimeError as e:
         return jsonify(errore=str(e)), 503
     return jsonify(r)
+
+
+# ============================ ALEXA (casa) ============================
+API_ALEXA = "http://127.0.0.1:3011"
+
+
+def alexa(percorso, dati=None):
+    corpo = json.dumps(dati).encode("utf-8") if dati is not None else None
+    req = urllib.request.Request(f"{API_ALEXA}/{percorso}", data=corpo, method="POST" if dati is not None else "GET",
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(json.loads(e.read().decode("utf-8") or "{}").get("errore", f"Alexa: errore {e.code}"))
+    except (urllib.error.URLError, OSError):
+        raise RuntimeError("Servizio Alexa spento.")
+
+
+@app.route("/api/alexa/<percorso>", methods=["GET", "POST"])
+@richiede_accesso
+def api_alexa(percorso):
+    if percorso not in ("stato", "dispositivi", "comando", "parla"):
+        abort(404)
+    try:
+        return jsonify(alexa(percorso, request.get_json(silent=True) if request.method == "POST" else None))
+    except RuntimeError as e:
+        return jsonify(errore=str(e)), 503
+
+
+# =============================== SPOTIFY ===============================
+@app.route("/spotify/accedi")
+@richiede_accesso
+def spotify_accedi():
+    import spotify_jarvis
+
+    if request.host.split(":")[0] != "127.0.0.1":
+        return redirect(f"http://127.0.0.1:{config.PORTA_PANNELLO}/spotify/accedi")
+    try:
+        return redirect(spotify_jarvis.url_accesso())
+    except spotify_jarvis.ErroreSpotify as e:
+        return str(e), 400
+
+
+@app.route("/spotify/callback")
+@richiede_accesso
+def spotify_callback():
+    import spotify_jarvis
+
+    if request.args.get("error"):
+        return "Accesso a Spotify annullato.", 400
+    try:
+        spotify_jarvis.completa_accesso(request.args.get("code", ""), request.args.get("state", ""))
+    except spotify_jarvis.ErroreSpotify as e:
+        return str(e), 400
+    return redirect("/?spotify=ok")
+
+
+@app.route("/api/spotify/stato")
+@richiede_accesso
+def api_spotify_stato():
+    import spotify_jarvis
+
+    if not spotify_jarvis.configurato():
+        return jsonify(collegato=False, client_id=bool(getattr(config, "SPOTIFY_CLIENT_ID", "")))
+    try:
+        return jsonify(collegato=True, in_ascolto=spotify_jarvis.in_ascolto())
+    except spotify_jarvis.ErroreSpotify as e:
+        return jsonify(collegato=True, errore=str(e))
+
+
+# =============================== DISCORD ===============================
+@app.route("/api/discord/messaggi")
+@richiede_accesso
+def api_discord_messaggi():
+    import discord_jarvis
+
+    try:
+        nome, msgs = discord_jarvis.ultimi_messaggi(request.args.get("canale"))
+        return jsonify(canale=nome, messaggi=msgs, canali=list(getattr(config, "DISCORD_CANALI", {})))
+    except discord_jarvis.ErroreDiscord as e:
+        return jsonify(errore=str(e), canali=list(getattr(config, "DISCORD_CANALI", {}))), 400
+
+
+@app.route("/api/discord/scrivi", methods=["POST"])
+@richiede_accesso
+def api_discord_scrivi():
+    import discord_jarvis
+
+    d = request.get_json(silent=True) or {}
+    if not (d.get("testo") or "").strip():
+        return jsonify(errore=errore_utente("Messaggio vuoto.")), 400
+    try:
+        return jsonify(canale=discord_jarvis.scrivi(d.get("canale"), d["testo"]))
+    except discord_jarvis.ErroreDiscord as e:
+        return jsonify(errore=str(e)), 400
+
+
+# ========================= CLASSEVIVA E AGENDA =========================
+@app.route("/api/classeviva/<azione>", methods=["GET", "POST"])
+@richiede_accesso
+def api_classeviva(azione):
+    import classeviva
+
+    try:
+        if azione == "stato":
+            return jsonify(collegato=classeviva.configurato())
+        if azione == "accedi" and request.method == "POST":
+            d = request.get_json(silent=True) or {}
+            r = classeviva.salva_credenziali(d.get("utente"), d.get("password"))
+            extra.registra("classeviva", "collegato", request.remote_addr)
+            return jsonify(r)
+        if azione == "scollega" and request.method == "POST":
+            classeviva.elimina_credenziali()
+            return jsonify(ok=True)
+    except classeviva.ErroreClasseViva as e:
+        return jsonify(errore=str(e)), 400
+    abort(404)
+
+
+@app.route("/api/agenda")
+@richiede_accesso
+def api_agenda():
+    import agenda
+
+    impegni, avvisi = agenda.prossimi(int(request.args.get("giorni", 7)))
+    return jsonify(impegni=impegni, avvisi=avvisi)
+
+
+@app.route("/api/agenda/nuovi")
+@richiede_accesso
+def api_agenda_nuovi():
+    import agenda
+
+    nuovi = agenda.nuovi_da_riferire(segna=request.args.get("segna", "1") == "1")
+    return jsonify([{**i, "frase": agenda.frase(i)} for i in nuovi])
 
 
 # ================================ COMPITI ================================

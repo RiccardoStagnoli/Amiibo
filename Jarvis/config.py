@@ -113,3 +113,18 @@ TEAMS_POSTA_SCUOLA = False
 COMPITI_MITTENTI = []
 # Ogni quanti minuti controllare Teams e la posta. 0 = mai in automatico.
 COMPITI_OGNI_MINUTI = 15
+
+# ------------------------- CLASSEVIVA (GUIDA, Fase 26) -------------------------
+# Le credenziali si inseriscono dal pannello (sezione Compiti). Interfaccia NON ufficiale:
+# se Spaggiari la cambia, questi valori potrebbero dover essere aggiornati.
+CLASSEVIVA_API = "https://web.spaggiari.eu/rest/v1"
+CLASSEVIVA_USER_AGENT = "CVVS/std/4.1.7 Android/10"
+CLASSEVIVA_APIKEY = "Tg1NWEwNGIgIC0K"
+
+# ------------------------- SPOTIFY (GUIDA, Fase 27) -------------------------
+SPOTIFY_CLIENT_ID = ""
+
+# ------------------------- DISCORD (GUIDA, Fase 28) -------------------------
+DISCORD_BOT_TOKEN = ""
+# nome che userai nei comandi -> ID del canale (tasto destro sul canale -> Copia ID canale)
+DISCORD_CANALI = {}

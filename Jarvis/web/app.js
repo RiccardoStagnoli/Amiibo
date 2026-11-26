@@ -328,7 +328,8 @@ function mostraSezione(nome) {
   if (nome === 'memoria') caricaMemoria();
   if (nome === 'media') caricaMedia();
   if (nome === 'github') caricaGitHub();
-  if (nome === 'compiti') caricaCompiti();
+  if (nome === 'compiti') { caricaCompiti(); statoClasseViva(); }
+  if (nome === 'casa') caricaCasa();
   if (nome === 'scrittura') { preparaLavagna(); statoScrittura(); }
 }
 
@@ -450,12 +451,18 @@ async function aggiornaSistema() {
 
 async function aggiornaAgenda() {
   try {
-    const ev = await api('/api/calendario/oggi');
-    $('#w-agenda').replaceChildren(...(ev.length ? ev.map((e) => el('div', {},
-      el('strong', {}, e.inizio && e.inizio.includes('T') ? dataOra(e.inizio) + ' ' : 'Giornata · '), e.titolo))
-      : [el('span', { class: 'nota' }, 'Nessun impegno oggi.')]));
-    return ev;
-  } catch (e) { $('#w-agenda').replaceChildren(el('span', { class: 'nota' }, e.message.slice(0, 120))); return null; }
+    const r = await api('/api/agenda');
+    const nuovi = new Set((await api('/api/agenda/nuovi?segna=0')).map((x) => x.id));
+    const lista = [...r.impegni.filter((x) => nuovi.has(x.id)), ...r.impegni.filter((x) => !nuovi.has(x.id))].slice(0, 8);
+    $('#w-agenda').replaceChildren(...(lista.length ? lista.map((x) => el('div', { class: nuovi.has(x.id) ? 'nuovo-agenda' : '' },
+      nuovi.has(x.id) ? el('span', { class: 'badge-nuovo' }, 'NUOVO') : null,
+      el('strong', {}, dataOra(x.quando) + ' '), x.titolo,
+      x.dettaglio ? el('div', { class: 'sotto nota' }, x.dettaglio.slice(0, 90)) : null))
+      : [el('span', { class: 'nota' }, 'Nessun impegno nei prossimi 7 giorni.' + (r.avvisi.length ? ' ' + r.avvisi.join(' ') : ''))]));
+  } catch (e) { $('#w-agenda').replaceChildren(el('span', { class: 'nota' }, e.message.slice(0, 120))); }
+  try {
+    return await api('/api/calendario/oggi'); // impegni di oggi, letti nel rapporto
+  } catch { return null; }
 }
 
 async function aggiornaPromemoria() {
@@ -540,6 +547,10 @@ async function rapporto(conSaluto = true) {
   rapportoInCorso = true;
   try {
     if (conSaluto) parla(F.saluto(profilo.nome));
+    try {
+      const nuoviAgenda = await api('/api/agenda/nuovi');
+      if (nuoviAgenda.length) parla('Nuovo in agenda: ' + nuoviAgenda.map((x) => x.frase).join('; ') + '.');
+    } catch { /* agenda non disponibile */ }
     const lista = await api('/api/segreteria?solo_nuovi=1').catch(() => []);
     const complete = lista.filter((r) => r.stato === 'completato');
     parla(F.segreteria(complete.length));
@@ -994,6 +1005,99 @@ $('#form-documento').addEventListener('submit', async (e) => {
 });
 
 // =========================================================================
+// CASA: Alexa, Spotify, Discord
+// =========================================================================
+async function caricaCasa() {
+  // Alexa
+  try {
+    const s = await api('/api/alexa/stato');
+    if (s.pronto) {
+      const d = await api('/api/alexa/dispositivi');
+      $('#alexa-stato').replaceChildren(el('span', { class: 'esito-ok' }, 'Alexa collegata. '),
+        el('span', {}, 'Echo: ' + (d.echo.map((x) => x.nome).join(', ') || 'nessuno')));
+      $('#alexa-dispositivi').replaceChildren(...(d.casa.length ? d.casa : ['(elenco non disponibile: usa i nomi che usi con Alexa)']).map((n) =>
+        el('button', { class: 'btn piccolo sec', onclick: () => { $('#alexa-testo').value = `accendi ${n}`; $('#alexa-testo').focus(); } }, n)));
+    } else {
+      $('#alexa-stato').replaceChildren(el('span', { class: 'esito-ko' }, 'Alexa non collegata. '),
+        el('span', {}, 'Dal PC server apri '), el('a', { href: s.accesso || 'http://127.0.0.1:3456', target: '_blank', rel: 'noopener' }, s.accesso || 'http://127.0.0.1:3456'),
+        el('span', {}, ' e accedi ad Amazon.'));
+    }
+  } catch (e) { $('#alexa-stato').textContent = e.message; }
+  // Spotify
+  try {
+    const s = await api('/api/spotify/stato');
+    if (!s.collegato) {
+      $('#spotify-stato').replaceChildren(s.client_id
+        ? el('span', {}, 'Non collegato. Dal PC server: ', el('a', { href: '/spotify/accedi' }, 'collega Spotify'))
+        : el('span', {}, 'Manca SPOTIFY_CLIENT_ID in config.py (GUIDA, Fase 27).'));
+    } else if (s.errore) {
+      $('#spotify-stato').textContent = s.errore;
+    } else {
+      $('#spotify-stato').textContent = s.in_ascolto ? `${s.in_ascolto.in_riproduzione ? '▶' : '⏸'} ${s.in_ascolto.titolo} – ${s.in_ascolto.artisti}` : 'Collegato. Niente in riproduzione.';
+    }
+  } catch (e) { $('#spotify-stato').textContent = e.message; }
+  caricaDiscord();
+}
+
+async function caricaDiscord(canale) {
+  try {
+    const r = await api('/api/discord/messaggi' + (canale ? '?canale=' + encodeURIComponent(canale) : ''));
+    const sel = $('#discord-canale');
+    if (!sel.options.length) sel.replaceChildren(...r.canali.map((c) => el('option', { value: c }, '#' + c)));
+    sel.value = r.canale;
+    $('#discord-messaggi').replaceChildren(...(r.messaggi.length ? r.messaggi.map((m) =>
+      el('div', { class: 'voce' }, el('div', { class: 'titolo' }, el('span', {}, m.autore), el('span', { class: 'sotto' }, dataOra(m.ora))), el('div', {}, m.testo)))
+      : [el('p', { class: 'nota' }, 'Nessun messaggio.')]));
+  } catch (e) { $('#discord-messaggi').replaceChildren(el('p', { class: 'nota' }, e.message)); }
+}
+
+$('#form-alexa').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const t = $('#alexa-testo').value.trim();
+  if (!t) { scrivi(rimprovero('Cosa devo dire ad Alexa? Niente, a quanto pare.', 'Comando vuoto.'), true); return; }
+  $('#alexa-testo').value = '';
+  eseguiComando('alexa ' + t);
+});
+$$('[data-spotify]').forEach((b) => b.addEventListener('click', async () => { await eseguiComando(b.dataset.spotify); setTimeout(caricaCasa, 1200); }));
+$('#form-spotify').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const q = $('#spotify-cerca').value.trim();
+  if (q) eseguiComando(`metti ${q} su spotify`);
+  $('#spotify-cerca').value = '';
+});
+$('#discord-canale').addEventListener('change', (e) => caricaDiscord(e.target.value));
+$('#form-discord').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    const r = await api('/api/discord/scrivi', { canale: $('#discord-canale').value, testo: $('#discord-testo').value });
+    scrivi(`Scritto su Discord in #${r.canale}.`); $('#discord-testo').value = ''; caricaDiscord(r.canale);
+  } catch (err) { scrivi(err.message, true); }
+});
+
+// =========================================================================
+// CLASSEVIVA (nella sezione Compiti)
+// =========================================================================
+async function statoClasseViva() {
+  try {
+    const s = await api('/api/classeviva/stato');
+    $('#form-classeviva').hidden = s.collegato;
+    $('#cv-collegato').hidden = !s.collegato;
+  } catch { /* niente */ }
+}
+$('#form-classeviva').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    const r = await api('/api/classeviva/accedi', { utente: $('#cv-utente').value, password: $('#cv-password').value });
+    $('#cv-password').value = '';
+    scrivi(`ClasseViva collegato: ${r.nome || r.utente}.`); statoClasseViva();
+  } catch (err) { scrivi(err.message, true); suono('errore'); }
+});
+$('#btn-cv-scollega').addEventListener('click', async () => {
+  if (!confirm('Scollegare ClasseViva? Le credenziali verranno cancellate dal server.')) return;
+  await api('/api/classeviva/scollega', {}); statoClasseViva();
+});
+
+// =========================================================================
 // COMPITI (bozze: si inviano solo scrivendo/dicendo "manda esercizio")
 // =========================================================================
 async function caricaCompiti() {
@@ -1027,7 +1131,8 @@ function schedaCompito(b, numero) {
         : el('div', { class: 'sotto' }, 'Non risolto in automatico: segui i consigli o scrivimi il testo completo.'))),
     inviabile ? el('h3', {}, 'Risposta da inviare (puoi modificarla)') : null,
     inviabile ? area : el('p', { class: 'nota' }, b.fonte === 'teams_compito'
-      ? 'Compito di Teams: si consegna dall\'app Teams (apri il link) caricando la foto o il file.' : ''),
+      ? 'Compito di Teams: si consegna dall\'app Teams (apri il link) caricando la foto o il file.'
+      : b.fonte === 'classeviva' ? 'Compito da ClasseViva: non si invia da qui, va svolto e consegnato come chiede il professore.' : ''),
     el('div', { class: 'azioni' },
       inviabile ? el('button', {
         class: 'btn',

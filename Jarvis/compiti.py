@@ -198,6 +198,8 @@ def _aggiorna(id_bozza, **campi):
 def crea_bozza(fonte, origine_id, da, titolo, testo, scadenza=None, destinazione=None, url=None):
     esercizi = prepara(testo)
     tipo = "digitale" if RX_DIGITALE.search(testo) and not RX_FOGLIO.search(testo) else "foglio"
+    if fonte == "classeviva":
+        tipo = "foglio"  # da ClasseViva non si consegna niente: Jarvis prepara spiegazione e consigli
     bozza = {
         "id": f"{int(time.time() * 1000)}", "fonte": fonte, "origine_id": origine_id, "da": da, "titolo": titolo,
         "testo": testo, "scadenza": scadenza, "destinazione": destinazione, "url": url, "tipo": tipo,
@@ -261,6 +263,18 @@ def scansiona():
         except Exception as e:
             avvisi.append(f"Teams: {e}")
     try:
+        import classeviva
+
+        if classeviva.configurato():
+            for e in classeviva.compiti(14):
+                if e["id"] in visti or not e["testo"]:
+                    continue
+                b = crea_bozza("classeviva", e["id"], e["docente"] or "ClasseViva", f"{e['materia']} (ClasseViva)",
+                               e["testo"], scadenza=e["inizio"])
+                nuove.append(b)
+    except Exception as e:
+        avvisi.append(f"ClasseViva: {e}")
+    try:
         import gmail_reader
 
         domini = [x.lower() for x in getattr(config, "COMPITI_MITTENTI", [])]
@@ -316,6 +330,8 @@ def invia(id_bozza):
         import gmail_reader
 
         dove = "email a " + gmail_reader.invia_risposta(b["destinazione"], testo)
+    elif b["fonte"] == "classeviva":
+        raise ValueError("Da ClasseViva non si può inviare niente: è un compito da fare e consegnare come chiede il professore.")
     else:
         raise ValueError("I compiti di Teams (Assignments) si consegnano dall'app Teams: apri il link del compito, "
                          "incolla la risposta o carica la foto del foglio.")

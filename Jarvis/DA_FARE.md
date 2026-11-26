@@ -126,6 +126,20 @@ Spunta ogni riga quando l'hai fatta.
 - [ ] **26o.** Sezione **Scrittura** → **Allenamento**: scrivi ogni lettera 3–5 volte (circa 10 minuti).
 - [ ] **26p.** Quando Jarvis evidenzia una parola in arancione, correggila e premi **Conferma e impara**.
 
+## E7. ClasseViva, Spotify, Discord, Alexa (Fasi 26–29)
+
+- [ ] **26q.** Sezione Compiti → collega **ClasseViva**.
+- [ ] **26r.** Esegui di nuovo `installa_whatsapp.bat`, poi riavvia `avvia_server_jarvis.bat` (4 finestre).
+- [ ] **26s.** Dal PC server apri http://127.0.0.1:3456 e accedi ad **Amazon** (Alexa).
+- [ ] **26t.** **Spotify**:
+  - crea l'app sul Developer Dashboard (Redirect `http://127.0.0.1:8080/spotify/callback`);
+  - metti il Client ID in `config.py`;
+  - dal PC server apri http://127.0.0.1:8080/spotify/accedi.
+- [ ] **26u.** **Discord**:
+  - crea il bot e attiva il Message Content Intent;
+  - aggiungi il bot al tuo server;
+  - in `config.py` metti il token e gli ID dei canali.
+
 ## F. Telefono Vodafone (non automatizzabile gratis)
 
 - [ ] **27.** Facoltativo: chiama il **42020** e registra il saluto della segreteria: *"Riccardo non è al momento raggiungibile..."*.

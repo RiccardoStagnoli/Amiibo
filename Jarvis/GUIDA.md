@@ -549,6 +549,57 @@ Comandi: `controlla i compiti`, `compiti`, `mostra esercizio 1`, `consigli 1`, `
 
 **Nota:** consegnare come proprio un lavoro preparato da Jarvis può essere contro le regole della scuola. Usa soluzioni e consigli per capire e verificare.
 
+## Fase 26 – ClasseViva e agenda
+
+**ClasseViva** (registro Spaggiari): nella sezione **Compiti** inserisci codice utente (o email) e password → **Collega ClasseViva**. Se la password è sbagliata, Jarvis non salva niente.
+- Le credenziali restano solo sul PC server (`C:\Jarvis\dati\.classeviva.json`).
+- ClasseViva **non ha un'interfaccia ufficiale**: Jarvis usa quella delle app, documentata dalla community. Funzionamento con il tuo account **non verificato**; se Spaggiari la cambia potrebbe smettere di funzionare (impostazioni `CLASSEVIVA_*` in `config.py`).
+- I **compiti** di ClasseViva diventano bozze nella sezione Compiti, come per Teams: spiegazione, consigli, soluzione per controllo. **Non si inviano**: ClasseViva non lo permette, e Jarvis rifiuta anche "manda esercizio".
+
+**Agenda unificata** (Google Calendar + ClasseViva: compiti, verifiche, interrogazioni, annotazioni):
+- ogni giorno, nel **riepilogo** delle `ORA_RIEPILOGO`, Jarvis ti dice per prime le **novità** in agenda e poi i **prossimi impegni dei 7 giorni**;
+- ogni volta che compare un **impegno nuovo** ti avvisa subito (a voce dal pannello e con un WhatsApp a te stesso; controllo ogni `COMPITI_OGNI_MINUTI`). Nel **rapporto** dell'attivazione le novità vengono dette **prima di tutto il resto**;
+- quando colleghi una fonte per la prima volta, gli impegni già presenti non vengono segnalati come nuovi (niente valanga di avvisi);
+- widget **Agenda** nella Centrale con l'etichetta **NUOVO**;
+- comandi: `agenda`, `cosa ho in agenda`, `verifiche`.
+
+## Fase 27 – Spotify
+
+1. Vai su <https://developer.spotify.com/dashboard> → accedi → **Create app**:
+   - nome `Jarvis`;
+   - Redirect URI: **`http://127.0.0.1:8080/spotify/callback`** (esattamente così: Spotify non accetta "localhost");
+   - API: **Web API** → **Save**.
+2. Copia il **Client ID** in `config.py` → `SPOTIFY_CLIENT_ID = "..."` e riavvia il server.
+3. **Dal PC server** apri <http://127.0.0.1:8080/spotify/accedi> e autorizza.
+4. Comandi: `metti bohemian rhapsody su spotify`, `metti playlist chill su spotify`, `pausa spotify`, `riprendi spotify`, `prossima canzone`, `canzone precedente`, `volume spotify 40`, `cosa sto ascoltando`. Pulsanti nella sezione **Casa**.
+
+**Limite:** Spotify permette di comandare la riproduzione solo con **Premium**. Senza Premium, `metti ... su spotify` apre Spotify sul PC Msi con la ricerca, e premi play tu. Deve essere aperto un dispositivo Spotify (PC o telefono).
+
+## Fase 28 – Discord
+
+Jarvis usa un **bot** (ufficiale e gratuito), che legge e scrive solo nei server dove lo aggiungi. Controllare il tuo account personale con un programma ("self-bot") è vietato da Discord e può far chiudere l'account: Jarvis non lo fa, quindi non legge i tuoi messaggi privati.
+1. <https://discord.com/developers/applications> → **New Application** `Jarvis` → **Bot** → **Reset Token** → copia il token in `config.py` → `DISCORD_BOT_TOKEN`.
+2. Nella stessa pagina attiva **Message Content Intent** (serve per leggere il testo dei messaggi).
+3. **OAuth2 → URL Generator**: spunta `bot`, poi i permessi **View Channels**, **Send Messages**, **Read Message History**. Apri il link generato e aggiungi il bot al tuo server.
+4. In Discord: Impostazioni utente → Avanzate → **Modalità sviluppatore**. Poi tasto destro sul canale → **Copia ID canale**.
+5. In `config.py`: `DISCORD_CANALI = {"generale": "123...", "compiti": "456..."}` e riavvia.
+6. Comandi: `messaggi discord`, `messaggi discord compiti`, `scrivi su discord compiti: domani porto gli appunti`. Sezione **Casa** del pannello.
+
+## Fase 29 – Alexa, dispositivi di casa e Amazon Music
+
+Amazon **non offre un modo ufficiale** per comandare Alexa da un programma personale. Jarvis usa la libreria open source **alexa-remote2** (non ufficiale): manda ad Alexa comandi scritti, **come se glieli dicessi a voce**. Così controlla tutto quello che controlla la tua Alexa: luci, prese, TV, termostato, tapparelle, robot aspirapolvere e **Amazon Music**, che non ha un'interfaccia pubblica.
+1. Esegui di nuovo `installa_whatsapp.bat` (installa anche alexa-remote2). `avvia_server_jarvis.bat` ora apre una quarta finestra "JARVIS - Alexa".
+2. **Dal PC server** apri <http://127.0.0.1:3456> e accedi con il tuo account Amazon (anche con il codice di verifica). L'accesso viene salvato in `C:\Jarvis\dati\alexa_cookie.json` e rinnovato da solo.
+3. Comandi:
+   - `accendi la luce del salotto`, `spegni la tv`, `abbassa le tapparelle`, `imposta il termostato a 21 gradi`;
+   - `alexa <qualsiasi cosa>` (es. `alexa, che tempo fa domani`);
+   - `metti musica rilassante su amazon music`;
+   - `dispositivi`, `annuncia su alexa: la cena è pronta`.
+   I nomi dei dispositivi sono quelli che usi con Alexa. "spegni il pc" resta invece un comando del PC Msi.
+4. Per usare un Echo preciso invece del primo trovato: variabile di sistema `ALEXA_DISPOSITIVO` con il nome dell'Echo.
+
+**Limiti:** non ufficiale, Amazon può cambiarlo. L'accesso ogni tanto potrebbe essere da rifare (pagina 3456). Funzionamento con il tuo account **non verificato**.
+
 ## Il manuale di meccanica
 
 - **Titolo:** *La Vettura Automobile – Sue parti, suo funzionamento*

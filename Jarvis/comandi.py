@@ -29,6 +29,9 @@ def risposta(testo, esito="ok", **extra):
 
 AIUTO = (
     "Comandi: 'apri chrome e cerca ...', 'cerca su youtube ...', 'apri steam e scarica ...', "
+    "Casa: 'alexa accendi la luce', 'accendi la luce del salotto', 'metti jazz su amazon music', 'dispositivi'. "
+    "Musica: 'metti ... su spotify', 'pausa spotify', 'prossima canzone', 'cosa sto ascoltando'. "
+    "Discord: 'messaggi discord', 'scrivi su discord generale: ...'. Agenda: 'agenda', 'verifiche'. "
     "Compiti: 'controlla i compiti', 'compiti', 'mostra esercizio 1', 'manda esercizio 1', 'consigli 1'. "
     "Esercizi: 'risolvi x^2-5x+6=0', 'deriva ...', 'integra ... da 0 a 3', 'converti 120 km/h in m/s', "
     "oppure il testo dell'esercizio con dati e unità (es. 'un'auto accelera a 2 m/s² per 10 s, che velocità raggiunge?'). "
@@ -140,7 +143,8 @@ class Interprete:
             (r"^(leggi|controlla) (la )?(posta|email|mail|gmail)$", self.posta),
             (r"^(pulisci|analizza|controlla) (la )?(posta|gmail|spam|casella)$", self.pulizia),
             (r"^(spazio|quanto spazio)( (account|google|gmail|drive|ho))*$", self.spazio),
-            (r"^(agenda|calendario|impegni)( (di )?oggi)?$", self.agenda),
+            (r"^(agenda|calendario|impegni|prossimi impegni|cosa ho in agenda|cosa devo fare)( (di )?oggi| della settimana)?$", self.agenda),
+            (r"^(le )?(mie )?verifiche$|^(ho )?(delle )?verifiche( in arrivo)?$", lambda m: self.agenda_tipo("verifica")),
             (r"^(aggiungi (al calendario|un evento|evento)|crea (un )?evento):? ?(?P<t>.*)$", self.evento),
             # --- WhatsApp ---
             (r"^(leggi|controlla) (i )?(messaggi|whatsapp)( whatsapp)?$", self.wa_leggi),
@@ -159,6 +163,25 @@ class Interprete:
             (r"^(non disturbare|modalita non disturbare)( per (?P<n>\S+) (?P<u>or[ae]|minuti))?$", self.non_disturbare),
             (r"^(fine|basta|disattiva) (non disturbare|modalita non disturbare)$", lambda m: self.s["fine_non_disturbare"]()),
             (r"^(riepilogo|briefing)( (di oggi|giornaliero))?$", lambda m: risposta(self.s["riepilogo"]())),
+            # --- Alexa e casa (comandi come se parlassi ad Alexa) ---
+            (r"^alexa[,:]? (?P<c>.+)$", lambda m: self.alexa(m["c"])),
+            (r"^(dispositivi|i miei dispositivi)( alexa| di casa)?$", lambda m: self.alexa_dispositivi()),
+            (r"^(annuncia|di|dì) (su|con) alexa[,:]? (?P<t>.+)$", lambda m: self.alexa_parla(m["t"])),
+            (r"^(?P<c>(accendi|spegni|alza|abbassa|apri|chiudi|imposta|regola|attiva|disattiva) (la |il |lo |le |i |gli |l')?"
+             r"(luc|lampad|prese?\b|presa|tv|televisor|condizionator|clima|riscaldament|termostat|tapparell|serrand|ventilator|"
+             r"aspirapolver|robot|stufa|caldaia|cancello|allarme|camera|salotto|cucina|bagno).*)$", lambda m: self.alexa(m["c"])),
+            (r"^(metti|riproduci|suona|fai partire) (?P<q>.+) su amazon music$", lambda m: self.alexa(f"riproduci {m['q']} su amazon music")),
+            # --- Spotify ---
+            (r"^(metti|riproduci|suona|fai partire) (?P<q>.+) su spotify$", lambda m: self.spotify_riproduci(m["q"])),
+            (r"^(pausa|ferma|stop) spotify$|^metti in pausa spotify$|^ferma la musica$", lambda m: self.spotify("pausa")),
+            (r"^riprendi spotify$|^(riprendi|fai ripartire) la musica$", lambda m: self.spotify("riprendi")),
+            (r"^(prossima canzone|canzone successiva|prossimo brano|salta( canzone)?)$", lambda m: self.spotify("avanti")),
+            (r"^(canzone precedente|brano precedente)$", lambda m: self.spotify("indietro")),
+            (r"^volume spotify (a |al )?(?P<v>\d{1,3})( ?%| per cento)?$", lambda m: self.spotify("volume", m["v"])),
+            (r"^(cosa sto ascoltando|che canzone e( questa)?|cosa suona spotify)$", lambda m: self.spotify_ascolto()),
+            # --- Discord (bot) ---
+            (r"^(leggi |controlla )?(i )?messaggi (di |su )?discord( (in |nel canale )?(?P<c>[\w-]+))?$", lambda m: self.discord_leggi(m["c"])),
+            (r"^scrivi su discord( (in |nel canale )?(?P<c>[\w-]+))?[:,] ?(?P<t>.*)$", lambda m: self.discord_scrivi(m["c"], m["t"])),
             # --- Compiti dai professori (bozze: si inviano SOLO con "manda esercizio") ---
             (r"^(controlla|guarda|cerca) (i )?(compiti|esercizi)( nuovi)?$|^controlla teams e (la )?posta$|^ci sono (nuovi )?(esercizi|compiti)$",
              lambda m: self.compiti_scansiona()),
@@ -290,14 +313,24 @@ class Interprete:
         return risposta(testo + ".")
 
     def agenda(self, _m):
-        ev = self.s["eventi_oggi"]()
-        if not ev:
-            return risposta("Nessun impegno oggi.")
-        parti = []
-        for e in ev:
-            ora = e["inizio"][11:16] if "T" in (e["inizio"] or "") else "tutto il giorno"
-            parti.append(f"{ora} {e['titolo']}")
-        return risposta(f"Oggi: {'; '.join(parti)}.")
+        import agenda
+
+        impegni, avvisi = agenda.prossimi(7)
+        nuovi = {x["id"] for x in agenda.nuovi_da_riferire()}
+        if not impegni:
+            return risposta("Nessun impegno nei prossimi 7 giorni." + (" " + " ".join(avvisi) if avvisi else ""))
+        ordinati = [x for x in impegni if x["id"] in nuovi] + [x for x in impegni if x["id"] not in nuovi]
+        righe = [("NUOVO – " if x["id"] in nuovi else "") + agenda.frase(x) for x in ordinati[:12]]
+        return risposta("Prossimi impegni: " + "; ".join(righe) + "." + (" " + " ".join(avvisi) if avvisi else ""))
+
+    def agenda_tipo(self, tipo):
+        import agenda
+
+        impegni, avvisi = agenda.prossimi(30)
+        scelti = [x for x in impegni if x.get("tipo") == tipo]
+        if not scelti:
+            return risposta(f"Nessuna {tipo} in agenda nei prossimi 30 giorni." + (" " + " ".join(avvisi) if avvisi else ""))
+        return risposta(f"{tipo.capitalize()}: " + "; ".join(agenda.frase(x) for x in scelti) + ".")
 
     def evento(self, m):
         if not m["t"].strip():
@@ -664,3 +697,91 @@ class Interprete:
             return errore
         righe = [f"Esercizio {i}: " + " ".join(e["consigli"]) for i, e in enumerate(b["esercizi"], 1)]
         return risposta("\n".join(righe) or "Nessun esercizio individuato nel messaggio.")
+
+    # ------------------------------ Alexa ------------------------------
+    def alexa(self, testo):
+        testo = testo.strip()
+        if not testo:
+            return risposta(errore_utente("Cosa devo dire ad Alexa?"), "errore_utente")
+        try:
+            r = self.s["alexa"]("comando", {"testo": testo})
+        except RuntimeError as e:
+            return risposta(str(e), "errore")
+        return risposta(f"Detto ad Alexa ({r.get('echo')}): \"{testo}\".")
+
+    def alexa_parla(self, testo):
+        try:
+            r = self.s["alexa"]("parla", {"testo": testo})
+        except RuntimeError as e:
+            return risposta(str(e), "errore")
+        return risposta(f"Annunciato su {r.get('echo')}.")
+
+    def alexa_dispositivi(self):
+        try:
+            r = self.s["alexa"]("dispositivi")
+        except RuntimeError as e:
+            return risposta(str(e), "errore")
+        testo = "Echo: " + (", ".join(d["nome"] for d in r["echo"]) or "nessuno") + "."
+        if r.get("casa"):
+            testo += " Dispositivi di casa: " + ", ".join(r["casa"][:30]) + "."
+        return risposta(testo)
+
+    # ------------------------------ Spotify ------------------------------
+    def spotify(self, azione, valore=None):
+        import spotify_jarvis as sp
+
+        try:
+            return risposta(sp.comando(azione, valore))
+        except sp.ErroreSpotify as e:
+            if str(e) == "PREMIUM":
+                return risposta("Spotify permette di comandare la riproduzione solo con l'account Premium.", "errore")
+            return risposta(str(e), "errore")
+
+    def spotify_riproduci(self, testo):
+        import spotify_jarvis as sp
+
+        try:
+            return risposta(sp.riproduci(testo))
+        except sp.ErroreSpotify as e:
+            if str(e) == "PREMIUM" or "non collegato" in str(e):
+                # senza Premium (o senza collegamento): apro Spotify sul PC Msi con la ricerca
+                import urllib.parse
+
+                r = self.msi("apri_uri", {"uri": "spotify:search:" + urllib.parse.quote(testo)})
+                if r.get("esito") == "ok":
+                    return risposta("Senza Spotify Premium non posso avviare il brano: ho aperto la ricerca su Spotify nel PC Msi, premi play.")
+            return risposta(str(e), "errore")
+
+    def spotify_ascolto(self):
+        import spotify_jarvis as sp
+
+        try:
+            b = sp.in_ascolto()
+        except sp.ErroreSpotify as e:
+            return risposta(str(e), "errore")
+        if not b:
+            return risposta("Su Spotify non sta suonando niente.")
+        return risposta(f"{'Stai ascoltando' if b['in_riproduzione'] else 'In pausa'}: {b['titolo']} di {b['artisti']}.")
+
+    # ------------------------------ Discord ------------------------------
+    def discord_leggi(self, canale):
+        import discord_jarvis as dj
+
+        try:
+            nome, msgs = dj.ultimi_messaggi(canale)
+        except dj.ErroreDiscord as e:
+            return risposta(str(e), "errore")
+        if not msgs:
+            return risposta(f"Nessun messaggio in #{nome}.")
+        return risposta(f"#{nome}: " + " ".join(f"{m['autore']}: {m['testo'][:200]}." for m in msgs[-8:]))
+
+    def discord_scrivi(self, canale, testo):
+        import discord_jarvis as dj
+
+        if not (testo or "").strip():
+            return risposta(errore_utente("Cosa devo scrivere su Discord? Messaggio vuoto."), "errore_utente")
+        try:
+            nome = dj.scrivi(canale, testo.strip())
+        except dj.ErroreDiscord as e:
+            return risposta(str(e), "errore")
+        return risposta(f"Scritto su Discord in #{nome}.")
