@@ -445,6 +445,31 @@ Jarvis controlla Chrome sul Msi: apre e chiude schede, naviga, legge le pagine, 
 - Qualsiasi programma installato sul Msi però potrebbe usarla mentre il Chrome di Jarvis è aperto: non installare programmi di dubbia provenienza.
 - Per disattivare il controllo: `CHROME_CONTROLLO = False` in `msi_agente.py`.
 
+## Fase 22 – GitHub
+
+Jarvis usa l'API ufficiale di GitHub con un **token personale** che crei tu. Il token vale come una password: resta solo sul PC server (`C:\Jarvis\dati\.github_token`) e il pannello non lo mostra mai.
+
+**Creare il token (una volta):**
+1. Su github.com: foto profilo in alto a destra → **Settings** → in fondo **Developer settings** → **Personal access tokens** → **Fine-grained tokens** → **Generate new token**.
+2. Token name: `Jarvis`. Expiration: a scelta (es. 1 anno; alla scadenza ne crei uno nuovo).
+3. Repository access: **All repositories**.
+4. Permissions → Repository permissions, imposta **Read and write** su: **Contents**, **Issues**, **Pull requests**; **Read-only** su: **Actions**, **Metadata**.
+5. **Generate token** e copialo subito (inizia con `github_pat_`): GitHub non lo mostra più.
+6. Pannello Jarvis → sezione **GitHub** → incolla il token → **Collega**. Se il token è sbagliato, Jarvis non lo salva.
+7. Per creare repository e leggere le notifiche: le notifiche richiedono un token "classic". *Dati insufficienti per verificare* se i token fine-grained le permettono nel tuo account: se nella sezione compare un errore sulle notifiche, crea invece un token **classic** (stessa pagina → Tokens (classic)) con gli ambiti `repo`, `workflow`, `notifications`.
+
+**Sezione GitHub del pannello:**
+- profilo, notifiche (con "segna come lette"), pull request e issue aperte che ti riguardano;
+- elenco dei repository con lo stato dell'ultima **build** (GitHub Actions);
+- apertura e **modifica di file** con salvataggio (commit) su GitHub;
+- nuove issue, commenti, chiusura issue, **unione di pull request** (con conferma).
+
+**Comandi:** `github`, `i miei repository`, `pull request`, `issue aperte`, `stato build jarvis`, `crea issue su jarvis: il microfono non va`, `commenta la pr 5 di jarvis: testato`, `chiudi issue 7 di jarvis`, `leggi il file README.md di Amiibo`, `crea repository privato prova`, `stella a owner/repo`, `cerca su github piper tts`.
+- Unire una pull request a voce o per iscritto richiede la parola **confermo**: `unisci la pr 5 di jarvis confermo`.
+- Nomi dei repository: regola del 90%. "jarvs" trova "jarvis"; un nome che non corrisponde non fa nulla.
+
+Il rapporto all'attivazione e il riepilogo quotidiano includono le notifiche GitHub non lette. Ogni operazione su GitHub finisce nel **Registro attività**.
+
 ## Il manuale di meccanica
 
 - **Titolo:** *La Vettura Automobile – Sue parti, suo funzionamento*

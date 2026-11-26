@@ -29,6 +29,8 @@ def risposta(testo, esito="ok", **extra):
 
 AIUTO = (
     "Comandi: 'apri chrome e cerca ...', 'cerca su youtube ...', 'apri steam e scarica ...', "
+    "GitHub: 'github', 'i miei repository', 'pull request', 'stato build <repo>', 'crea issue su <repo>: ...', "
+    "'leggi il file <percorso> di <repo>', 'cerca su github ...'. "
     "Chrome: 'nuova scheda ...', 'schede', 'passa alla scheda ...', 'chiudi scheda', 'indietro', 'leggi la pagina', "
     "'clicca su ...', 'digita ...', 'premi invio', 'scorri giu', 'pausa', 'screenshot chrome', "
     "'apri <programma>', 'screenshot msi', 'blocca msi', 'spegni msi', 'leggi messaggi', "
@@ -162,6 +164,21 @@ class Interprete:
             (r"^(domanda|chiedi|cerca nei documenti)[:,]? (?P<q>.+)$", lambda m: self.chiedi(m["q"])),
             # --- Meccanica ---
             (r"^meccanica[:,]? ?(?P<q>.*)$", self.meccanica),
+            # --- GitHub ---
+            (r"^(github|notifiche (di )?github|controlla github|novita (su|di) github)$", lambda m: self.gh_notifiche()),
+            (r"^segna (le )?notifiche (di )?github come lette$", lambda m: self.gh(lambda g: (g.segna_notifiche_lette(), "Notifiche GitHub segnate come lette.")[1])),
+            (r"^(i )?(miei )?repository( github| su github)?$|^elenca i (miei )?repository$", lambda m: self.gh_repo()),
+            (r"^(le )?(mie )?issue( aperte)?( su github)?$", lambda m: self.gh_elenco("issue")),
+            (r"^(le )?(mie )?(pull request|pr)( aperte)?( su github)?$", lambda m: self.gh_elenco("pr")),
+            (r"^stato (della |delle )?(build|ci|actions|test) (di |del |su |in )?(?P<r>\S+)$", self.gh_build),
+            (r"^cerca su github (?P<q>.+)$", self.gh_cerca),
+            (r"^(metti una )?stella (a|su) (?P<r>\S+)$", lambda m: self.gh(lambda g: (g.metti_stella(g.trova_repo(m["r"])), f"Stella aggiunta a {m['r']}.")[1])),
+            (r"^crea (una )?issue (su|in|nel|per) (?P<r>[^:]+): ?(?P<t>.*)$", self.gh_crea_issue),
+            (r"^commenta (la )?(issue|pr|pull request) (?P<n>\d+) (di|su|in|del) (?P<r>[^:]+): ?(?P<t>.*)$", self.gh_commenta),
+            (r"^chiudi (la )?issue (?P<n>\d+) (di|su|in|del) (?P<r>\S+)$", lambda m: self.gh(lambda g: (g.chiudi_issue(g.trova_repo(m["r"]), m["n"]), f"Issue {m['n']} chiusa.")[1])),
+            (r"^leggi (il )?file (?P<p>\S+) (di|su|in|del) (?P<r>\S+)$", self.gh_leggi_file),
+            (r"^crea (un )?(nuovo )?repository (?P<v>privato |pubblico )?(?P<n>[\w.-]+)$", self.gh_crea_repo),
+            (r"^unisci (la )?(pull request|pr) (?P<n>\d+) (di|su|in|del) (?P<r>\S+?)(?P<ok> confermo)?$", self.gh_unisci),
             # --- Chrome (controllo completo, sul PC Msi) ---
             (r"^(apri )?(una )?nuova scheda( (con|su))? ?(?P<u>.*)$", lambda m: self.chrome("vai", url=(m["u"].strip() or "www.google.com"), nuova=True)),
             (r"^(quali )?schede( aperte)?$|^che schede (ho|sono) apert[ei]$", lambda m: self.chrome("schede")),
@@ -435,3 +452,89 @@ class Interprete:
         if not testo:
             return risposta(errore_utente("Digitare cosa?"), "errore_utente")
         return self.chrome("digita", testo=testo, invio=bool(m["invio"]))
+
+    # ------------------------------ GitHub ------------------------------
+    def gh(self, funzione):
+        import github_jarvis as g
+
+        try:
+            esito = funzione(g)
+        except g.ErroreGitHub as e:
+            return risposta(str(e), "errore")
+        return esito if isinstance(esito, dict) else risposta(esito)
+
+    def gh_notifiche(self):
+        def f(g):
+            n = [x for x in g.notifiche() if x["non_letta"]]
+            if not n:
+                return "Nessuna notifica GitHub non letta."
+            return f"{len(n)} notifiche GitHub: " + "; ".join(f"{x['repo']}: {x['titolo']}" for x in n[:6]) + "."
+        return self.gh(f)
+
+    def gh_repo(self):
+        return self.gh(lambda g: (lambda r: f"{len(r)} repository. Aggiornati di recente: "
+                                  + ", ".join(x["nome"].split("/")[1] for x in r[:8]) + ".")(g.repository(30)))
+
+    def gh_elenco(self, tipo):
+        def f(g):
+            lista = g.issue_aperte() if tipo == "issue" else g.pr_aperte()
+            nome = "issue" if tipo == "issue" else "pull request"
+            if not lista:
+                return f"Nessuna {nome} aperta che ti riguarda."
+            return f"{len(lista)} {nome} aperte: " + "; ".join(f"{x['repo']} #{x['numero']} {x['titolo']}" for x in lista[:6]) + "."
+        return self.gh(f)
+
+    def gh_build(self, m):
+        def f(g):
+            repo = g.trova_repo(m["r"])
+            runs = g.stato_build(repo)
+            if not runs:
+                return f"{repo}: nessuna build (GitHub Actions) trovata."
+            x = runs[0]
+            esito = {"success": "riuscita", "failure": "FALLITA", "cancelled": "annullata"}.get(x["esito"], x["esito"] or x["stato"])
+            return f"{repo}: ultima build '{x['nome']}' sul ramo {x['ramo']}: {esito}."
+        return self.gh(f)
+
+    def gh_cerca(self, m):
+        return self.gh(lambda g: (lambda r: "Nessun risultato." if not r else "Su GitHub: " + "; ".join(
+            f"{x['nome']} ({x['stelle']} stelle)" for x in r[:5]) + ".")(g.cerca_repository(m["q"])))
+
+    def gh_crea_issue(self, m):
+        titolo = m["t"].strip()
+        if not titolo:
+            return risposta(errore_utente("Manca il titolo dell'issue."), "errore_utente")
+
+        def f(g):
+            repo = g.trova_repo(m["r"])
+            r = g.crea_issue(repo, titolo, "Creata da Jarvis.")
+            return f"Issue #{r['numero']} creata su {repo}."
+        return self.gh(f)
+
+    def gh_commenta(self, m):
+        testo = m["t"].strip()
+        if not testo:
+            return risposta(errore_utente("Commento vuoto. Cosa devo scrivere?"), "errore_utente")
+        return self.gh(lambda g: (g.commenta(g.trova_repo(m["r"]), m["n"], testo), f"Commento aggiunto al numero {m['n']}.")[1])
+
+    def gh_leggi_file(self, m):
+        def f(g):
+            r = g.leggi_file(g.trova_repo(m["r"]), m["p"])
+            if r["cartella"]:
+                return f"{m['p']} è una cartella: " + ", ".join(r["voci"][:30]) + "."
+            return f"{m['p']} ({r['dimensione']} byte):\n{r['testo'][:3000]}"
+        return self.gh(f)
+
+    def gh_crea_repo(self, m):
+        privato = (m["v"] or "privato ").strip() != "pubblico"
+        return self.gh(lambda g: (lambda r: f"Repository {r['nome']} creato ({'privato' if privato else 'pubblico'}).")(
+            g.crea_repository(m["n"], privato)))
+
+    def gh_unisci(self, m):
+        if not m["ok"]:
+            return risposta(f"Unire la pull request {m['n']} di {m['r']} non si annulla facilmente. "
+                            f"Ripeti aggiungendo 'confermo': 'unisci la pr {m['n']} di {m['r']} confermo'.", "incerto")
+
+        def f(g):
+            r = g.unisci_pr(g.trova_repo(m["r"]), m["n"])
+            return f"Pull request {m['n']} unita." if r["unita"] else f"Non unita: {r['messaggio']}"
+        return self.gh(f)

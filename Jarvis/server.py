@@ -562,6 +562,14 @@ def riepilogo():
             parti.append(f"Teams: {len(teams_reader.nuovi_messaggi()['messaggi'])} nuovi messaggi dei professori.")
         except Exception:
             pass
+    try:
+        import github_jarvis
+
+        if github_jarvis.configurato():
+            n = [x for x in github_jarvis.notifiche() if x["non_letta"]]
+            parti.append(f"GitHub: {len(n)} notifiche non lette.")
+    except Exception:
+        pass
     oggi_iso = time.strftime("%Y-%m-%d")
     prom = [p for p in extra.promemoria() if p["quando"][:10] == oggi_iso]
     if prom:
@@ -757,6 +765,95 @@ def api_media_invia():
     except RuntimeError as e:
         return jsonify(errore=str(e)), 503
     return jsonify(r)
+
+
+# ================================ GITHUB ================================
+def _gh(funzione):
+    import github_jarvis
+
+    try:
+        return jsonify(funzione(github_jarvis))
+    except github_jarvis.ErroreGitHub as e:
+        return jsonify(errore=str(e)), 400
+
+
+@app.route("/api/github")
+@richiede_accesso
+def api_github():
+    import github_jarvis as g
+
+    if not g.configurato():
+        return jsonify(configurato=False)
+    dati = {"configurato": True}
+    for chiave, funzione in (("profilo", g.profilo), ("notifiche", g.notifiche), ("pr", g.pr_aperte),
+                             ("issue", g.issue_aperte), ("repository", lambda: g.repository(30))):
+        try:
+            dati[chiave] = funzione()
+        except g.ErroreGitHub as e:
+            dati.setdefault("errori", []).append(str(e))
+    return jsonify(dati)
+
+
+@app.route("/api/github/token", methods=["POST"])
+@richiede_accesso
+def api_github_token():
+    valore = (request.get_json(silent=True) or {}).get("token", "")
+    r = _gh(lambda g: g.salva_token(valore))
+    rifiutato = isinstance(r, tuple)  # (risposta, 400) in caso di errore
+    extra.registra("github", "token rifiutato" if rifiutato else "token collegato", request.remote_addr)
+    return r
+
+
+@app.route("/api/github/scollega", methods=["POST"])
+@richiede_accesso
+def api_github_scollega():
+    import github_jarvis
+
+    github_jarvis.elimina_token()
+    extra.registra("github", "scollegato", request.remote_addr)
+    return jsonify(ok=True)
+
+
+@app.route("/api/github/file", methods=["POST"])
+@richiede_accesso
+def api_github_file():
+    d = request.get_json(silent=True) or {}
+    return _gh(lambda g: g.leggi_file(g.trova_repo(d.get("repo", "")), d.get("percorso", "")))
+
+
+@app.route("/api/github/salva_file", methods=["POST"])
+@richiede_accesso
+def api_github_salva_file():
+    d = request.get_json(silent=True) or {}
+    if not d.get("percorso") or d.get("testo") is None:
+        return jsonify(errore=errore_utente("Servono percorso e contenuto del file.")), 400
+    r = _gh(lambda g: g.scrivi_file(g.trova_repo(d.get("repo", "")), d["percorso"], d["testo"], d.get("messaggio", "")))
+    extra.registra("github", f"file {d.get('repo')}/{d['percorso']}", request.remote_addr)
+    return r
+
+
+@app.route("/api/github/build", methods=["POST"])
+@richiede_accesso
+def api_github_build():
+    d = request.get_json(silent=True) or {}
+    return _gh(lambda g: g.stato_build(g.trova_repo(d.get("repo", ""))))
+
+
+@app.route("/api/github/unisci", methods=["POST"])
+@richiede_accesso
+def api_github_unisci():
+    d = request.get_json(silent=True) or {}
+    if d.get("conferma") is not True:
+        return jsonify(errore="Serve conferma esplicita."), 400
+    r = _gh(lambda g: g.unisci_pr(d.get("repo", ""), d.get("numero", 0)))
+    extra.registra("github", f"unione PR {d.get('repo')}#{d.get('numero')}", request.remote_addr)
+    return r
+
+
+@app.route("/api/github/notifiche_lette", methods=["POST"])
+@richiede_accesso
+def api_github_lette():
+    return _gh(lambda g: (g.segna_notifiche_lette(), {"ok": True})[1])
 
 
 # ============================ APP PER TELEFONO ============================

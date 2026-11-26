@@ -305,3 +305,9 @@ label.btn { display: inline-block; }
 .qr-telefono { width: 220px; max-width: 100%; border-radius: var(--raggio); border: 1px solid var(--bordo); }
 
 a.btn { text-decoration: none; text-align: center; }
+
+/* GitHub */
+#form-gh-file, #form-gh-issue { flex-wrap: wrap; }
+#form-gh-file .campo, #form-gh-issue .campo { min-width: 160px; }
+.editor { width: 100%; min-height: 320px; font-family: Consolas, "Courier New", monospace; font-size: 0.85rem; margin-top: 10px; white-space: pre; }
+.esito-ok { color: var(--verde); } .esito-ko { color: var(--rosso); }

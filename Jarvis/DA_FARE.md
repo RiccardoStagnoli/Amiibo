@@ -115,6 +115,11 @@ Spunta ogni riga quando l'hai fatta.
   - esegui `installa_msi.bat`, poi `avvia_msi.bat`.
 - [ ] **26i.** Di' o scrivi `apri chrome`, poi nella nuova finestra accedi a Google e attiva la sincronizzazione.
 
+## E5. GitHub (Fase 22)
+
+- [ ] **26l.** Crea un token su GitHub (Fine-grained, permessi indicati nella guida).
+- [ ] **26m.** Incollalo nel pannello: sezione GitHub → Collega.
+
 ## F. Telefono Vodafone (non automatizzabile gratis)
 
 - [ ] **27.** Facoltativo: chiama il **42020** e registra il saluto della segreteria: *"Riccardo non è al momento raggiungibile..."*.

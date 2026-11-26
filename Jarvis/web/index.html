@@ -52,6 +52,7 @@
   <button data-sezione="gmail">Google</button>
   <button data-sezione="teams">Teams</button>
   <button data-sezione="msi">Msi</button>
+  <button data-sezione="github">GitHub</button>
   <button data-sezione="meccanica">Meccanica</button>
   <button data-sezione="media">Media</button>
   <button data-sezione="memoria">Memoria</button>
@@ -202,6 +203,54 @@
         <button class="btn" type="submit">Chiedi</button>
       </form>
       <div id="risposta-meccanica" class="risposta"></div>
+    </div>
+  </section>
+
+  <!-- GITHUB -->
+  <section id="github" class="sezione">
+    <div class="pannello" id="gh-collega" hidden>
+      <h2>Collega GitHub</h2>
+      <p class="nota">Crea un token su github.com → Settings → Developer settings → Personal access tokens (GUIDA, Fase 22) e incollalo qui. Resta solo sul PC server.</p>
+      <form id="form-gh-token" class="composer">
+        <input id="gh-token" class="campo" type="password" placeholder="github_pat_..." autocomplete="off">
+        <button class="btn" type="submit">Collega</button>
+      </form>
+    </div>
+    <div class="pannello" id="gh-profilo-zona" hidden>
+      <h2>GitHub</h2>
+      <div id="gh-profilo" class="nota"></div>
+      <div class="azioni">
+        <button class="btn sec" id="btn-gh-aggiorna">Aggiorna</button>
+        <button class="btn sec" id="btn-gh-lette">Segna notifiche come lette</button>
+        <button class="btn piccolo pericolo" id="btn-gh-scollega">Scollega</button>
+      </div>
+    </div>
+    <div class="widget-griglia" id="gh-griglia" hidden>
+      <div class="pannello"><h2>Notifiche</h2><div id="gh-notifiche" class="lista compatta"></div></div>
+      <div class="pannello"><h2>Pull request aperte</h2><div id="gh-pr" class="lista compatta"></div></div>
+      <div class="pannello"><h2>Issue aperte</h2><div id="gh-issue" class="lista compatta"></div></div>
+      <div class="pannello"><h2>Repository</h2><div id="gh-repo" class="lista compatta"></div></div>
+      <div class="pannello largo">
+        <h2>File</h2>
+        <form id="form-gh-file" class="composer">
+          <input id="gh-file-repo" class="campo" placeholder="repository (es. Amiibo)" autocomplete="off">
+          <input id="gh-file-percorso" class="campo" placeholder="percorso (es. README.md)" autocomplete="off">
+          <button class="btn" type="submit">Apri</button>
+        </form>
+        <textarea id="gh-file-testo" class="campo editor" spellcheck="false" hidden></textarea>
+        <div class="azioni" id="gh-file-azioni" hidden>
+          <input id="gh-file-messaggio" class="campo" placeholder="Descrizione della modifica (commit)">
+          <button class="btn" id="btn-gh-salva">Salva su GitHub</button>
+        </div>
+      </div>
+      <div class="pannello largo">
+        <h2>Nuova issue</h2>
+        <form id="form-gh-issue" class="composer">
+          <input id="gh-issue-repo" class="campo" placeholder="repository" autocomplete="off">
+          <input id="gh-issue-titolo" class="campo" placeholder="titolo" autocomplete="off">
+          <button class="btn" type="submit">Crea</button>
+        </form>
+      </div>
     </div>
   </section>
 

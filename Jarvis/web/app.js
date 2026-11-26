@@ -327,6 +327,7 @@ function mostraSezione(nome) {
   if (nome === 'msi') aggiornaSistema();
   if (nome === 'memoria') caricaMemoria();
   if (nome === 'media') caricaMedia();
+  if (nome === 'github') caricaGitHub();
 }
 
 setInterval(() => { $('#orologio').textContent = new Date().toLocaleTimeString('it-IT'); }, 1000);
@@ -568,6 +569,14 @@ async function rapporto(conSaluto = true) {
       const diOggi = pr.promemoria.filter((p) => new Date(p.quando).toDateString() === oggi);
       if (diOggi.length) parla('Promemoria di oggi: ' + diOggi.map((p) => `${dataOra(p.quando)} ${p.testo}`).join('; '));
     } catch { /* niente */ }
+
+    try {
+      const g = await api('/api/github');
+      if (g.configurato) {
+        const n = (g.notifiche || []).filter((x) => x.non_letta);
+        parla(n.length ? `GitHub: ${n.length} notifiche. ` + n.slice(0, 4).map((x) => `${x.repo.split('/')[1]}: ${x.titolo}`).join('; ') : 'GitHub: nessuna notifica.');
+      }
+    } catch { /* GitHub non collegato */ }
 
     const ev = await aggiornaAgenda();
     if (ev) {
@@ -973,6 +982,121 @@ $('#form-documento').addEventListener('submit', async (e) => {
     $('#file-documento').value = '';
     caricaMemoria();
   } catch (err) { scrivi(err.message, true); suono('errore'); }
+});
+
+// =========================================================================
+// GITHUB
+// =========================================================================
+let ghFileAperto = null;
+
+function rigaGh(titolo, sotto, url, ...pulsanti) {
+  return el('div', { class: 'voce' },
+    el('div', { class: 'titolo' }, el('span', {}, titolo), url ? el('a', { class: 'btn piccolo sec', href: url, target: '_blank', rel: 'noopener' }, 'Apri') : null),
+    sotto ? el('div', { class: 'sotto' }, sotto) : null,
+    pulsanti.length ? el('div', { class: 'azioni', style: 'margin:4px 0 0' }, ...pulsanti) : null);
+}
+
+async function caricaGitHub() {
+  try {
+    const d = await api('/api/github');
+    $('#gh-collega').hidden = d.configurato;
+    $('#gh-profilo-zona').hidden = !d.configurato;
+    $('#gh-griglia').hidden = !d.configurato;
+    if (!d.configurato) return;
+    const p = d.profilo || {};
+    $('#gh-profilo').textContent = `Collegato come ${p.utente || '?'} · ${p.repo_pubblici ?? '?'} repo pubblici, ${p.repo_privati ?? '?'} privati`
+      + (d.errori ? ' · ' + d.errori.join(' ') : '');
+    const vuoto = (t) => [el('p', { class: 'nota' }, t)];
+    const notif = (d.notifiche || []).filter((n) => n.non_letta);
+    $('#gh-notifiche').replaceChildren(...(notif.length ? notif.map((n) => rigaGh(n.titolo, `${n.repo} · ${n.tipo} · ${n.motivo}`)) : vuoto('Nessuna notifica non letta.')));
+    $('#gh-pr').replaceChildren(...((d.pr || []).length ? d.pr.map((x) => rigaGh(`#${x.numero} ${x.titolo}`, `${x.repo} · ${x.autore}`, x.url,
+      el('button', { class: 'btn piccolo sec', onclick: () => commentaGh(x) }, 'Commenta'),
+      el('button', { class: 'btn piccolo pericolo', onclick: () => unisciGh(x) }, 'Unisci'))) : vuoto('Nessuna pull request aperta.')));
+    $('#gh-issue').replaceChildren(...((d.issue || []).filter((x) => !x.pr).length ? d.issue.filter((x) => !x.pr).map((x) => rigaGh(`#${x.numero} ${x.titolo}`, `${x.repo} · ${x.autore}`, x.url,
+      el('button', { class: 'btn piccolo sec', onclick: () => commentaGh(x) }, 'Commenta'),
+      el('button', { class: 'btn piccolo sec', onclick: () => eseguiComando(`chiudi issue ${x.numero} di ${x.repo}`).then(caricaGitHub) }, 'Chiudi'))) : vuoto('Nessuna issue aperta.')));
+    $('#gh-repo').replaceChildren(...((d.repository || []).map((r) => {
+      const esito = el('span', { class: 'sotto' });
+      return rigaGh(r.nome + (r.privato ? ' 🔒' : ''), r.descrizione || `★ ${r.stelle}`, r.url,
+        el('button', {
+          class: 'btn piccolo sec',
+          onclick: async () => {
+            esito.textContent = ' controllo...';
+            try {
+              const b = await api('/api/github/build', { repo: r.nome });
+              const u = b[0];
+              esito.textContent = u ? ` ultima build: ${u.esito || u.stato}` : ' nessuna build';
+              esito.className = 'sotto ' + (u && u.esito === 'success' ? 'esito-ok' : u && u.esito === 'failure' ? 'esito-ko' : '');
+            } catch (e) { esito.textContent = ' ' + e.message; }
+          },
+        }, 'Build'),
+        el('button', { class: 'btn piccolo sec', onclick: () => { $('#gh-file-repo').value = r.nome; $('#gh-file-percorso').focus(); } }, 'File'),
+        esito);
+    })));
+  } catch (e) { $('#gh-profilo').textContent = e.message; }
+}
+
+async function commentaGh(x) {
+  const testo = prompt(`Commento per ${x.repo} #${x.numero}:`);
+  if (testo === null) return;
+  if (!testo.trim()) { scrivi(rimprovero('Commento vuoto. Bravo.', 'Commento vuoto.'), true); return; }
+  await eseguiComando(`commenta la issue ${x.numero} di ${x.repo}: ${testo}`);
+}
+
+async function unisciGh(x) {
+  if (!confirm(`Unire la pull request #${x.numero} "${x.titolo}" in ${x.repo}? Non si annulla facilmente.`)) return;
+  try {
+    const r = await api('/api/github/unisci', { repo: x.repo, numero: x.numero, conferma: true });
+    scrivi(r.unita ? `Pull request #${x.numero} unita.` : `Non unita: ${r.messaggio}`, !r.unita);
+    caricaGitHub();
+  } catch (e) { scrivi(e.message, true); }
+}
+
+$('#form-gh-token').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    const p = await api('/api/github/token', { token: $('#gh-token').value });
+    $('#gh-token').value = '';
+    scrivi(`GitHub collegato come ${p.utente}.`);
+    caricaGitHub();
+  } catch (err) { scrivi(err.message, true); suono('errore'); }
+});
+$('#btn-gh-aggiorna').addEventListener('click', caricaGitHub);
+$('#btn-gh-lette').addEventListener('click', async () => {
+  try { await api('/api/github/notifiche_lette', {}); scrivi('Notifiche segnate come lette.'); caricaGitHub(); } catch (e) { scrivi(e.message, true); }
+});
+$('#btn-gh-scollega').addEventListener('click', async () => {
+  if (!confirm('Scollegare GitHub? Il token verrà cancellato dal server.')) return;
+  await api('/api/github/scollega', {}); caricaGitHub();
+});
+$('#form-gh-file').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    const r = await api('/api/github/file', { repo: $('#gh-file-repo').value, percorso: $('#gh-file-percorso').value });
+    const area = $('#gh-file-testo');
+    area.hidden = false;
+    if (r.cartella) {
+      area.value = r.voci.join('\n'); area.readOnly = true; $('#gh-file-azioni').hidden = true; ghFileAperto = null;
+    } else {
+      area.value = r.testo; area.readOnly = false; $('#gh-file-azioni').hidden = false;
+      ghFileAperto = { repo: $('#gh-file-repo').value, percorso: $('#gh-file-percorso').value };
+    }
+  } catch (err) { scrivi(err.message, true); }
+});
+$('#btn-gh-salva').addEventListener('click', async () => {
+  if (!ghFileAperto) return;
+  if (!confirm(`Salvare le modifiche a ${ghFileAperto.percorso} con un commit su GitHub?`)) return;
+  try {
+    const r = await api('/api/github/salva_file', { ...ghFileAperto, testo: $('#gh-file-testo').value, messaggio: $('#gh-file-messaggio').value });
+    scrivi(`Salvato su GitHub (commit ${r.commit}).`);
+    $('#gh-file-messaggio').value = '';
+  } catch (err) { scrivi(err.message, true); }
+});
+$('#form-gh-issue').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  await eseguiComando(`crea issue su ${$('#gh-issue-repo').value}: ${$('#gh-issue-titolo').value}`);
+  $('#gh-issue-titolo').value = '';
+  caricaGitHub();
 });
 
 // =========================================================================
