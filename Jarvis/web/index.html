@@ -34,6 +34,7 @@
     <span class="pillola" id="stato-wa">WhatsApp</span>
     <span class="pillola" id="stato-msi">Msi</span>
     <span class="pillola" id="stato-voce">Voce</span>
+    <span class="pillola" id="stato-ascolto" hidden>In ascolto</span>
     <span class="orologio" id="orologio">--:--</span>
     <button class="icona-btn" id="btn-schermo" title="Schermo intero" aria-label="Schermo intero">⛶</button>
   </div>
@@ -484,6 +485,8 @@
       <label class="riga">Velocit&agrave; <input type="range" id="velocita" min="0.5" max="1.5" step="0.05"></label>
       <label class="interruttore"><input type="checkbox" id="chk-saggio"><span>Parlata da saggio maestro</span></label>
       <label class="interruttore"><input type="checkbox" id="chk-voce"><span>Voce attiva</span></label>
+      <label class="interruttore"><input type="checkbox" id="chk-ascolto"><span>Ascolto sempre attivo su questo dispositivo: di' "Jarvis attivazione" (come Alexa)</span></label>
+      <p class="nota">Funziona con il pannello aperto e in primo piano (anche come app sul telefono), in Chrome o Edge. Il riconoscimento vocale del browser invia l'audio ai server di Google o Microsoft. Sul PC server l'attivazione è invece offline e sempre attiva (finestra "JARVIS - Ascolto").</p>
       <div class="azioni"><button class="btn" id="btn-prova-voce">Prova voce</button></div>
       <p class="nota">Per l'effetto "vecchio maestro" scegli una voce italiana non "Natural" (es. Microsoft Elsa o Cosimo): le voci "Natural" ignorano il tono.</p>
     </div>

@@ -628,6 +628,29 @@ Jarvis impara chi sei dai **dati che vede**: cosa ascolti, cosa cerchi, quali gi
 
 **Limite onesto:** Jarvis non può "conoscerti più di quanto ti conosci tu". Vede solo ciò che fai con lui e ciò che gli dici, e lo riassume con statistiche. Più lo usi e più gli dici, più è preciso.
 
+## Fase 31 – "Jarvis attivazione" come Alexa
+
+**Sul PC server** (sempre attivo, offline, finestra "JARVIS - Ascolto"):
+1. Di' **"Jarvis attivazione"** → bip → Jarvis risponde **"Sì?"** dalle casse.
+2. Di' il comando o la domanda (es. "che ore sono", "accendi la luce del salotto", "metti i Queen su Spotify", "novità per me").
+3. Jarvis **risponde a voce dalle casse** (voce Piper), senza aprire finestre.
+4. Dopo la risposta c'è un bip corto: per 6 secondi puoi fare **un'altra domanda senza ripetere** "Jarvis attivazione". Di' "grazie" o "basta" per chiudere.
+5. `rapporto` a voce ti legge il riepilogo (agenda nuova per prima, posta, WhatsApp, compiti…).
+6. Il pannello si apre da solo solo se la risposta va guardata (foto, guide, compiti). Per aprirlo sempre: `APRI_PANNELLO_CON_ATTIVAZIONE = True`.
+
+Impostazioni in `config.py`: `RISPOSTA_VOCALE_SERVER`, `RISPONDI_SI`, `CONVERSAZIONE_CONTINUA`, `SECONDI_CONVERSAZIONE`, `FRASE_ATTIVAZIONE`, `MODELLO_VOSK` (con `"vosk-model-it-0.22"` capisce meglio i comandi).
+Il microfono va collegato al PC server e le casse devono essere accese. Se Jarvis capisce male i comandi, parla vicino al microfono o usa il modello vocale grande.
+
+**Su telefono, PC e Rabbit R1** (con il pannello aperto):
+1. Impostazioni → Voce → spunta **"Ascolto sempre attivo su questo dispositivo"** e consenti il microfono.
+2. Di' **"Jarvis attivazione"** → "Sì?" → il comando → risposta a voce. Funziona anche tutto insieme: "Jarvis attivazione, che tempo fa".
+3. In alto compare la pillola **"In ascolto"** (diventa "Ti ascolto…" dopo l'attivazione).
+
+**Limiti** (diversi da un Echo):
+- Sul telefono funziona solo con l'app/pagina **aperta e in primo piano**: i browser non permettono di ascoltare in sottofondo o a schermo spento.
+- Il riconoscimento del browser (Chrome/Edge) **invia l'audio ai server di Google/Microsoft**. Quello sul PC server invece resta tutto in locale.
+- Sul Rabbit R1: *dati insufficienti per verificare* che il suo browser supporti il riconoscimento vocale.
+
 ## Il manuale di meccanica
 
 - **Titolo:** *La Vettura Automobile – Sue parti, suo funzionamento*

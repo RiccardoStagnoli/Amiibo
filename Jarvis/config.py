@@ -135,3 +135,15 @@ SUGGERIMENTI_ABITUDINI = True
 # Modello di Ollama per scrivere le guide passo passo. Vuoto = MODELLO_OLLAMA.
 # Per guide migliori serve un modello piu' grande, es. "qwen2.5:7b" (circa 5 GB, serve PC con 16 GB di RAM).
 MODELLO_GUIDE = ""
+
+# ------------------------- ATTIVAZIONE VOCALE "COME ALEXA" (GUIDA, Fase 31) -------------------------
+# True = dopo "Jarvis attivazione" Jarvis risponde a voce dalle casse del PC server (come Alexa).
+RISPOSTA_VOCALE_SERVER = True
+# Dopo l'attivazione dice "Si'?" prima di ascoltare.
+RISPONDI_SI = True
+# Apre anche il pannello a ogni attivazione (prima era sempre cosi'). Se False lo apre solo
+# quando la risposta va guardata (foto, guide, compiti).
+APRI_PANNELLO_CON_ATTIVAZIONE = False
+# Dopo una risposta resta in ascolto per un'altra domanda senza ripetere "Jarvis attivazione".
+CONVERSAZIONE_CONTINUA = True
+SECONDI_CONVERSAZIONE = 6

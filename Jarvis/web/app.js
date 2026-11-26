@@ -50,7 +50,7 @@ const dataOra = (iso) => {
 // =========================================================================
 const PREF_BASE = {
   voce: '', tono: 0.35, velocita: 0.85, saggio: null, attiva: true, motore: 'server',
-  tema: 'ciano', suoni: true, particelle: true, avvio: true,
+  tema: 'ciano', suoni: true, particelle: true, avvio: true, ascoltoSempre: false,
 };
 let pref = { ...PREF_BASE };
 try { pref = { ...PREF_BASE, ...JSON.parse(localStorage.getItem('jarvis_pref') || '{}') }; } catch { /* niente */ }
@@ -404,6 +404,99 @@ function dettatura(bottone, alRisultato) {
 }
 // Domanda a voce dal microfono del pannello -> risposta a voce.
 dettatura($('#btn-mic-comando'), (t) => { $('#testo-comando').value = t; eseguiComando(t, true); });
+
+// =========================================================================
+// ASCOLTO SEMPRE ATTIVO NEL PANNELLO ("Jarvis attivazione", come Alexa)
+// Usa il riconoscimento vocale del browser (Chrome/Edge: l'audio viene elaborato dai server
+// di Google/Microsoft). Funziona solo con il pannello aperto e in primo piano.
+// =========================================================================
+const RX_ATTIVAZIONE = /\b(jarvis|giarvis|jervis|jarvi|giarvi|gervis|travis)\b[\s,.]*(attivazione|attiva|attivati|attivo)\b/i;
+let ascoltoAttivo = false;
+let riconoscitoreContinuo = null;
+let attesaComando = false;
+let timerComando = null;
+let ultimoErroreAscolto = 0;
+
+function aggiornaPillolaAscolto(stato) {
+  const p = $('#stato-ascolto');
+  if (!p) return;
+  p.hidden = !ascoltoAttivo && stato !== 'errore';
+  p.textContent = stato === 'comando' ? 'Ti ascolto…' : stato === 'errore' ? 'Ascolto: errore' : 'In ascolto';
+  p.className = 'pillola ' + (stato === 'comando' ? 'ok ascolta-pillola' : stato === 'errore' ? 'ko' : 'ok');
+}
+
+function terminaAttesaComando() {
+  attesaComando = false;
+  clearTimeout(timerComando);
+  aggiornaPillolaAscolto('attivo');
+}
+
+function gestisciFraseSentita(frase) {
+  const testo = frase.trim();
+  if (!testo) return;
+  if (attesaComando) {
+    terminaAttesaComando();
+    if (/^(basta|grazie|niente|stop|annulla)\b/i.test(testo)) { suono('clic'); return; }
+    $('#testo-comando').value = testo;
+    eseguiComando(testo, true); // domanda a voce -> risposta a voce
+    return;
+  }
+  const m = testo.match(RX_ATTIVAZIONE);
+  if (!m) return;
+  const resto = testo.slice(m.index + m[0].length).replace(/^[\s,.]+/, '');
+  suono('notifica');
+  if (resto.length > 2) { // "Jarvis attivazione che ore sono" tutto insieme
+    $('#testo-comando').value = resto;
+    eseguiComando(resto, true);
+    return;
+  }
+  attesaComando = true;
+  aggiornaPillolaAscolto('comando');
+  parla('Sì?', false, true);
+  timerComando = setTimeout(() => { if (attesaComando) { terminaAttesaComando(); suono('clic'); } }, 8000);
+}
+
+function avviaAscoltoContinuo() {
+  if (!Riconoscitore) { scrivi('Questo browser non ha il riconoscimento vocale: usa Chrome o Edge.', true); return false; }
+  if (riconoscitoreContinuo) return true;
+  const r = new Riconoscitore();
+  r.lang = 'it-IT';
+  r.continuous = true;
+  r.interimResults = false;
+  r.onresult = (ev) => {
+    for (let i = ev.resultIndex; i < ev.results.length; i++) {
+      // mentre Jarvis parla ignora quello che sente (non deve rispondere a se stesso)
+      if (ev.results[i].isFinal && !parlaOra) gestisciFraseSentita(ev.results[i][0].transcript);
+    }
+  };
+  r.onerror = (ev) => {
+    if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
+      ascoltoAttivo = false; pref.ascoltoSempre = false; salvaPref();
+      $('#chk-ascolto').checked = false;
+      scrivi('Microfono non permesso: consenti il microfono a questa pagina nelle impostazioni del browser.', true);
+      aggiornaPillolaAscolto('errore');
+    }
+    ultimoErroreAscolto = Date.now();
+  };
+  r.onend = () => {
+    riconoscitoreContinuo = null;
+    // il browser chiude l'ascolto dopo un po': si riavvia da solo finche' l'interruttore e' acceso
+    if (ascoltoAttivo) setTimeout(avviaAscoltoContinuo, Date.now() - ultimoErroreAscolto < 3000 ? 2500 : 300);
+  };
+  try { r.start(); riconoscitoreContinuo = r; aggiornaPillolaAscolto('attivo'); return true; } catch { return false; }
+}
+
+function impostaAscoltoSempre(attivo) {
+  ascoltoAttivo = attivo;
+  pref.ascoltoSempre = attivo; salvaPref();
+  if (attivo) avviaAscoltoContinuo();
+  else if (riconoscitoreContinuo) { const r = riconoscitoreContinuo; riconoscitoreContinuo = null; r.abort(); }
+  aggiornaPillolaAscolto('attivo');
+}
+$('#chk-ascolto').addEventListener('change', (e) => impostaAscoltoSempre(e.target.checked));
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && ascoltoAttivo) avviaAscoltoContinuo();
+});
 
 // =========================================================================
 // ANNUNCI DAL SERVER (comandi vocali dati al PC server)
@@ -1717,6 +1810,7 @@ function preparaControlli() {
   $('#chk-suoni').checked = pref.suoni;
   $('#chk-particelle').checked = pref.particelle;
   $('#chk-avvio').checked = pref.avvio;
+  $('#chk-ascolto').checked = pref.ascoltoSempre;
   $('#sel-voce').addEventListener('change', (e) => { pref.voce = e.target.value; salvaPref(); });
   $('#sel-motore').value = pref.motore === 'browser' ? 'browser' : 'server';
   $('#sel-motore').addEventListener('change', (e) => { pref.motore = e.target.value; salvaPref(); aggiornaStatoVoce(); });
@@ -1750,5 +1844,6 @@ function preparaControlli() {
   if (attivazione) await rapporto(true); else aggiornaSegreteria(false);
   setInterval(() => { aggiornaSegreteria(true); statoWa(); aggiornaSistema(); }, 20000);
   setInterval(controllaAnnunci, 3000);
+  if (pref.ascoltoSempre) impostaAscoltoSempre(true);
   setInterval(aggiornaMeteo, 15 * 60 * 1000);
 }());

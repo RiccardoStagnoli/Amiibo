@@ -146,6 +146,12 @@ Spunta ogni riga quando l'hai fatta.
 - [ ] **26w.** Per le guide passo passo installa Ollama ed esegui `ollama pull qwen2.5:7b`, poi imposta `MODELLO_GUIDE = "qwen2.5:7b"`. Se il PC è lento, lascia vuoto (usa gemma2:2b).
 - [ ] **26x.** Se avevi già collegato Spotify, rifai l'accesso da http://127.0.0.1:8080/spotify/accedi (nuovo permesso per gli artisti preferiti).
 
+## E9. "Jarvis attivazione" come Alexa (Fase 31)
+
+- [ ] **26y.** Collega un microfono e delle casse al PC server, poi riavvia `avvia_server_jarvis.bat`.
+- [ ] **26z.** Di' "Jarvis attivazione", aspetta il "Sì?" e di' "che ore sono".
+- [ ] **26aa.** Sul telefono (app Jarvis): Impostazioni → Voce → "Ascolto sempre attivo".
+
 ## F. Telefono Vodafone (non automatizzabile gratis)
 
 - [ ] **27.** Facoltativo: chiama il **42020** e registra il saluto della segreteria: *"Riccardo non è al momento raggiungibile..."*.

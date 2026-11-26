@@ -360,3 +360,5 @@ a.btn { text-decoration: none; text-align: center; }
 
 .voce a:not(.btn), .sotto a, .guida a { color: var(--acc); }
 .voce a:not(.btn):visited { color: var(--acc-2); }
+
+.ascolta-pillola { animation: pulsa-btn 1s infinite; }
