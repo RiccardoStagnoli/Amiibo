@@ -128,3 +128,10 @@ SPOTIFY_CLIENT_ID = ""
 DISCORD_BOT_TOKEN = ""
 # nome che userai nei comandi -> ID del canale (tasto destro sul canale -> Copia ID canale)
 DISCORD_CANALI = {}
+
+# ------------------------- PER TE (GUIDA, Fase 30) -------------------------
+# Jarvis propone le cose che fai di solito a una certa ora ("sì, fallo" per accettare).
+SUGGERIMENTI_ABITUDINI = True
+# Modello di Ollama per scrivere le guide passo passo. Vuoto = MODELLO_OLLAMA.
+# Per guide migliori serve un modello piu' grande, es. "qwen2.5:7b" (circa 5 GB, serve PC con 16 GB di RAM).
+MODELLO_GUIDE = ""

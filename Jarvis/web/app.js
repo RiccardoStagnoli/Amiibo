@@ -2,6 +2,12 @@
 'use strict';
 
 const $ = (s) => document.querySelector(s);
+
+// replaceChildren del browser scrive "null" per gli elementi vuoti: li togliamo noi, ovunque.
+const _replaceChildrenOriginale = Element.prototype.replaceChildren;
+Element.prototype.replaceChildren = function replaceChildrenSicuro(...figli) {
+  return _replaceChildrenOriginale.apply(this, figli.flat().filter((f) => f !== null && f !== undefined && f !== false));
+};
 const $$ = (s) => [...document.querySelectorAll(s)];
 
 function el(tag, props = {}, ...figli) {
@@ -330,6 +336,7 @@ function mostraSezione(nome) {
   if (nome === 'github') caricaGitHub();
   if (nome === 'compiti') { caricaCompiti(); statoClasseViva(); }
   if (nome === 'casa') caricaCasa();
+  if (nome === 'perte') caricaPerTe();
   if (nome === 'scrittura') { preparaLavagna(); statoScrittura(); }
 }
 
@@ -361,6 +368,8 @@ function gestisciRisposta(r, voce = false) {
   if (r.azione_pannello === 'pulizia') { mostraSezione('gmail'); analizzaPosta(); }
   if (r.azione_pannello === 'scrittura') mostraSezione('scrittura');
   if (r.azione_pannello === 'compiti') mostraSezione('compiti');
+  if (r.azione_pannello === 'perte') mostraSezione('perte');
+  if (r.azione_pannello === 'guida' && r.guida) apriGuida(r.guida);
   if (r.azione_pannello === 'media') { mostraSezione('media'); evidenziaMedia(r.media || []); }
   if (r.fonti && r.fonti.length) mostraParlato(r.testo + '\nFonti: ' + r.fonti.map((f) => `${f.manuale} (${f.sezione})`).join(', '));
 }
@@ -1002,6 +1011,97 @@ $('#form-documento').addEventListener('submit', async (e) => {
     $('#file-documento').value = '';
     caricaMemoria();
   } catch (err) { scrivi(err.message, true); suono('errore'); }
+});
+
+// =========================================================================
+// PER TE: ritratto, gusti, scoperte, oggetti seguiti, guide
+// =========================================================================
+async function caricaPerTe() {
+  try {
+    const d = await api('/api/pertete');
+    $('#ritratto-testo').textContent = d.ritratto;
+    const p = d.profilo;
+    $('#interessi').replaceChildren(...(p.interessi.length ? p.interessi.map((i) => el('span', { class: 'chip', title: `${i.categoria} · peso ${i.peso}` },
+      i.termine, el('button', { class: 'chip-x', title: 'Dimentica', onclick: () => azionePerTe('dimentica', i.termine) }, '×')))
+      : [el('span', { class: 'nota' }, 'Ancora niente: dimmi cosa ti piace o usami di più.')]));
+    $('#non-piace').textContent = p.non_piace.length ? 'Non ti interessano: ' + p.non_piace.join(', ') : '';
+    $('#oggetti-seguiti').replaceChildren(...(d.oggetti.length ? d.oggetti.map((o) => el('span', { class: 'chip' }, o.nome,
+      el('button', { class: 'chip-x', title: 'Smetti di seguire', onclick: () => azionePerTe('smetti', o.nome) }, '×')))
+      : [el('span', { class: 'nota' }, 'Nessun oggetto seguito.')]));
+    $('#abitudini').replaceChildren(...(d.abitudini.length ? d.abitudini.slice(0, 8).map((a) =>
+      el('li', {}, `${a.quando} verso le ${a.ora}: "${a.comando}" (${a.volte} giorni)`)) : [el('li', { class: 'nota' }, 'Nessuna abitudine riconosciuta finora.')]));
+    $('#lista-guide').replaceChildren(...(d.guide.length ? d.guide.map((g) => el('div', { class: 'voce', onclick: () => apriGuida(g.id) },
+      el('div', { class: 'titolo' }, el('span', {}, g.titolo), el('span', { class: 'sotto' }, `${g.passi} passi · ${g.creata}`))))
+      : [el('p', { class: 'nota' }, 'Nessuna guida. Chiedi: "come si costruisce un aquilone".')]));
+  } catch (e) { $('#ritratto-testo').textContent = e.message; }
+}
+
+async function azionePerTe(azione, testo) {
+  try { await api('/api/pertete/' + azione, { testo }); caricaPerTe(); } catch (e) { scrivi(e.message, true); }
+}
+
+async function caricaScoperte() {
+  const box = $('#lista-scoperte');
+  box.replaceChildren(el('p', { class: 'nota' }, 'Cerco novità sui tuoi interessi...'));
+  try {
+    const r = await api('/api/pertete/scoperte');
+    const voci = r.scoperte.map((x) => el('div', { class: 'voce' },
+      el('div', { class: 'titolo' }, el('a', { href: x.link, target: '_blank', rel: 'noopener' }, x.titolo)),
+      el('div', { class: 'sotto' }, `${x.fonte} · ${dataOra(new Date(x.quando * 1000).toISOString())} · perché: ${x.perche}`),
+      el('div', { class: 'azioni', style: 'margin:4px 0 0' },
+        el('button', { class: 'btn piccolo sec', title: 'Mi interessa', onclick: async (ev) => { await api('/api/pertete/feedback', { link: x.link, titolo: x.titolo, voto: 1 }); ev.target.textContent = '👍 ok'; } }, '👍'),
+        el('button', { class: 'btn piccolo sec', title: 'Non mi interessa', onclick: async (ev) => { await api('/api/pertete/feedback', { link: x.link, titolo: x.titolo, voto: -1 }); ev.target.closest('.voce').remove(); } }, '👎'))));
+    const negozi = Object.entries(r.negozi).map(([nome, link]) => el('div', { class: 'voce' },
+      el('strong', {}, `Cerca "${nome}": `), ...Object.entries(link).map(([n, u]) => el('a', { class: 'btn piccolo sec', href: u, target: '_blank', rel: 'noopener' }, n))));
+    box.replaceChildren(...(voci.length ? voci : [el('p', { class: 'nota' }, 'Nessuna novità trovata.' + (r.avvisi[0] ? ' ' + r.avvisi[0] : ''))]),
+      negozi.length ? el('h3', {}, 'Oggetti che segui: dove cercarli') : null, ...negozi);
+  } catch (e) { box.replaceChildren(el('p', { class: 'errore' }, e.message)); }
+}
+
+let guidaAperta = null;
+function disegnaGuida(g) {
+  guidaAperta = g;
+  const zona = $('#guida-zona');
+  zona.hidden = false;
+  zona.replaceChildren(
+    el('h3', {}, g.titolo + (g.difficolta ? ` · ${g.difficolta}` : '') + (g.tempo ? ` · ${g.tempo}` : '')),
+    g.senza_ai ? el('p', { class: 'nota' }, 'Ollama non è attivo: ecco le fonti trovate invece di una guida scritta passo per passo (GUIDA, Fase 6).') : null,
+    g.sicurezza && g.sicurezza.length ? el('div', { class: 'avviso-sicurezza' }, '⚠ ', g.sicurezza.join(' ')) : null,
+    g.materiali && g.materiali.length ? el('p', {}, el('strong', {}, 'Materiali: '), g.materiali.join(', ')) : null,
+    g.attrezzi && g.attrezzi.length ? el('p', {}, el('strong', {}, 'Attrezzi: '), g.attrezzi.join(', ')) : null,
+    el('ol', { class: 'passi-guida' }, ...g.passi.map((p, i) => el('li', { class: i === g.passo ? 'passo-attuale' : (i < g.passo ? 'passo-fatto' : '') },
+      el('strong', {}, p.titolo), el('div', {}, p.dettaglio)))),
+    g.consigli && g.consigli.length ? el('p', { class: 'nota' }, 'Consigli: ' + g.consigli.join(' ')) : null,
+    el('div', { class: 'azioni' },
+      el('button', { class: 'btn sec', onclick: () => muoviGuida('indietro') }, '◀ Passo precedente'),
+      el('button', { class: 'btn', onclick: () => muoviGuida('avanti') }, 'Passo successivo ▶'),
+      el('button', { class: 'btn sec', onclick: () => parla(`Passo ${g.passo + 1}: ${g.passi[g.passo].titolo}. ${g.passi[g.passo].dettaglio}`) }, 'Leggimelo')),
+    g.fonti && g.fonti.length ? el('p', { class: 'sotto' }, 'Fonti: ', ...g.fonti.map((f) => (f.url ? el('a', { href: f.url, target: '_blank', rel: 'noopener' }, f.fonte + ' ') : f.fonte + ' '))) : null);
+}
+async function apriGuida(id) { try { disegnaGuida(await api('/api/guide/' + id)); mostraSezione('perte'); } catch (e) { scrivi(e.message, true); } }
+async function muoviGuida(direzione) {
+  try { const r = await api('/api/guide/muovi', { direzione }); disegnaGuida(r.guida); scrivi(r.testo); } catch (e) { scrivi(e.message, true); }
+}
+
+$('#form-piace').addEventListener('submit', (e) => { e.preventDefault(); const t = $('#piace-testo').value.trim(); $('#piace-testo').value = ''; azionePerTe('piace', t); });
+$('#btn-non-piace').addEventListener('click', () => { const t = $('#piace-testo').value.trim(); $('#piace-testo').value = ''; azionePerTe('non_piace', t); });
+$('#form-segui').addEventListener('submit', (e) => { e.preventDefault(); const t = $('#segui-testo').value.trim(); $('#segui-testo').value = ''; azionePerTe('segui', t); });
+$('#btn-scoperte').addEventListener('click', caricaScoperte);
+$('#btn-leggi-ritratto').addEventListener('click', () => parla($('#ritratto-testo').textContent));
+$('#form-guida').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const t = $('#guida-testo').value.trim();
+  if (!t) { scrivi(rimprovero('Costruire cosa? Il nulla?', 'Scrivi cosa vuoi costruire.'), true); return; }
+  scrivi('Preparo la guida (con Ollama può richiedere qualche minuto)...');
+  try {
+    const r = await api('/api/comando', { testo: 'come si costruisce ' + t });
+    if (r.guida) { apriGuida(r.guida); caricaPerTe(); }
+    scrivi(r.testo, r.esito !== 'ok');
+  } catch (err) { scrivi(err.message, true); }
+});
+$('#btn-cancella-profilo').addEventListener('click', async () => {
+  if (!confirm('Cancellare TUTTO quello che Jarvis ha imparato sui tuoi gusti? Non si può annullare.')) return;
+  await api('/api/pertete/cancella_tutto', { conferma: true }); caricaPerTe();
 });
 
 // =========================================================================

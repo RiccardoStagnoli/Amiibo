@@ -29,6 +29,8 @@ def risposta(testo, esito="ok", **extra):
 
 AIUTO = (
     "Comandi: 'apri chrome e cerca ...', 'cerca su youtube ...', 'apri steam e scarica ...', "
+    "Per te: 'mi piace ...', 'non mi piace ...', 'novità per me', 'tienimi d'occhio ...', 'cerca offerte per ...', "
+    "'come si costruisce ...', 'passo successivo', 'chi sono'. "
     "Casa: 'alexa accendi la luce', 'accendi la luce del salotto', 'metti jazz su amazon music', 'dispositivi'. "
     "Musica: 'metti ... su spotify', 'pausa spotify', 'prossima canzone', 'cosa sto ascoltando'. "
     "Discord: 'messaggi discord', 'scrivi su discord generale: ...'. Agenda: 'agenda', 'verifiche'. "
@@ -199,6 +201,24 @@ class Interprete:
             # --- Foto e video ---
             (r"^(mostra(mi)?|fammi vedere|trova|apri) (la |il |le |i |una |un )?(foto|video|immagine|immagini)( (di|della|del|dello|delle|dei|degli|con|sul|sulla))? (?P<q>.+)$", self.mostra_media),
             (r"^(mostra(mi)?|apri) (le |i )?(mie )?(foto|video|galleria)$", lambda m: risposta("Galleria aperta.", azione_pannello="media")),
+            # --- Gusti, scoperte, guide, ritratto ---
+            (r"^(chi sono|ritratto|cosa sai di me|come sono|descrivimi|conoscimi|quanto mi conosci)$", lambda m: self.ritratto()),
+            (r"^(non mi piace|non mi piacciono|odio|non mi interessa|non mi interessano) (?P<x>.+)$", lambda m: self.gusto(m["x"], False)),
+            (r"^(mi piace|mi piacciono|adoro|amo|sono appassionat[oa] di|mi interessa|mi interessano|mi appassiona) (?P<x>.+)$", lambda m: self.gusto(m["x"], True)),
+            (r"^(i miei gusti|cosa mi piace|i miei interessi)$", lambda m: self.miei_gusti()),
+            (r"^(novita|notizie|scoperte|cosa c'e di (nuovo|interessante))( per me)?$|^(novita|notizie) che mi interessano$", lambda m: self.scoperte()),
+            (r"^(smetti di seguire|non seguire piu) (?P<x>.+)$", lambda m: self.smetti(m["x"])),
+            (r"^(tienimi d'occhio|avvisami se esce|avvisami (?:quando|se) (?:ci sono novita|esce|escono) (?:su|di)|segui) (?P<x>.+)$", lambda m: self.segui(m["x"])),
+            (r"^(cosa segui|oggetti seguiti|cosa tieni d'occhio)$", lambda m: self.seguiti()),
+            (r"^cerca offert[ae] (per|di|su) (?P<x>.+)$", lambda m: self.offerte(m["x"])),
+            (r"^(come (si )?costruisc\w*|spiegami come (si )?(costruisce|costruire|fa|fare|realizza\w*)|guida (per|a)|"
+             r"come (posso )?(costruire|realizzare)|come si fa(nno)?( a (costruire|fare))?) (?P<x>.+)$", lambda m: self.guida(m["x"])),
+            (r"^(passo successivo|prossimo passo|fatto,? (il )?prossimo( passo)?|avanti con la guida)$", lambda m: self.passo("avanti")),
+            (r"^(passo precedente|torna al passo (prima|precedente))$", lambda m: self.passo("indietro")),
+            (r"^(ripeti( il passo)?|a che passo sono|ricominciamo la guida)$", lambda m: self.passo("inizio" if "ricomin" in m.group(0) else "resta")),
+            (r"^(materiali|attrezzi|cosa mi serve)( per la guida)?$", lambda m: self.materiali()),
+            (r"^(si|sì)[,]? (fallo|grazie|certo|vai)$|^fallo$|^si fallo$", lambda m: self.accetta_suggerimento()),
+            (r"^(no grazie|non ora|lascia stare)$", lambda m: self.rifiuta_suggerimento()),
             # --- Memoria: cose che mi insegni ---
             (r"^quando (dico|scrivo) (?P<a>.+?),? (intendi|fai|significa|vuol dire|esegui) (?P<b>.+)$", self.insegna_comando),
             (r"^(dimentica|cancella) il comando (?P<a>.+)$", self.dimentica_comando),
@@ -206,7 +226,7 @@ class Interprete:
             (r"^ricorda(mi)? di (?P<t>.+)$", lambda m: (extra.aggiungi_nota(m["t"].strip()), risposta(
                 f"Annotato: {m['t'].strip()}. Per un promemoria a tempo: 'ricordami tra 20 minuti di ...'."))[1]),
             (r"^(dimentica|cancella dalla memoria)( che)? (?P<f>.+)$", self.dimentica),
-            (r"^cosa (hai imparato|ricordi|sai di me)$", self.cosa_hai_imparato),
+            (r"^cosa (hai imparato|ricordi)$", self.cosa_hai_imparato),
             (r"^(cosa sai|cosa ricordi|dimmi cosa sai)( (di|su|del|della|dello|dei|delle|sul|sulla|sugli|sulle|riguardo a?))? (?P<q>.+)$", lambda m: self.chiedi(m["q"])),
             (r"^(domanda|chiedi|cerca nei documenti)[:,]? (?P<q>.+)$", lambda m: self.chiedi(m["q"])),
             # --- Meccanica ---
@@ -785,3 +805,123 @@ class Interprete:
         except dj.ErroreDiscord as e:
             return risposta(str(e), "errore")
         return risposta(f"Scritto su Discord in #{nome}.")
+
+    # ------------------------------ Gusti e ritratto ------------------------------
+    def ritratto(self):
+        import ritratto
+
+        testo, _ = ritratto.ritratto()
+        return risposta(testo, azione_pannello="perte")
+
+    def gusto(self, cosa, piace):
+        import gusti
+
+        cosa = re.sub(r"^(il|lo|la|i|gli|le|l'|un|uno|una|un')\s*", "", cosa.strip(" .!"), flags=re.I)
+        if not cosa:
+            return risposta(errore_utente("Cosa? Non l'hai detto."), "errore_utente")
+        if piace:
+            gusti.mi_piace(cosa)
+            return risposta(f"Segnato: ti piace {cosa}. Ti proporrò novità su questo.")
+        gusti.non_mi_piace(cosa)
+        return risposta(f"Segnato: {cosa} non ti interessa. Non te lo proporrò più.")
+
+    def miei_gusti(self):
+        import gusti
+
+        p = gusti.profilo()
+        if not p["interessi"] and not p["piace"]:
+            return risposta("Dati insufficienti per verificare: non so ancora cosa ti piace. Dimmelo ('mi piace ...') o usami di più.")
+        testo = "Ti interessano: " + ", ".join(i["termine"] for i in p["interessi"][:12]) + "."
+        if p["non_piace"]:
+            testo += " Non ti interessano: " + ", ".join(p["non_piace"][:8]) + "."
+        return risposta(testo, azione_pannello="perte")
+
+    def scoperte(self):
+        import scoperte
+
+        lista, avvisi = scoperte.per_te(8)
+        if not lista:
+            return risposta("Nessuna novità trovata per i tuoi interessi." + (" " + avvisi[0] if avvisi else ""))
+        return risposta("Per te: " + " ".join(f"{x['titolo']} ({x['fonte']})." for x in lista[:5]), azione_pannello="perte")
+
+    def segui(self, oggetto):
+        import scoperte
+
+        oggetto = oggetto.strip(" .!")
+        if len(oggetto) < 2:
+            return risposta(errore_utente("Seguire cosa?"), "errore_utente")
+        scoperte.segui(oggetto)
+        return risposta(f"Tengo d'occhio '{oggetto}': ti avviso quando escono notizie, uscite o recensioni.")
+
+    def smetti(self, oggetto):
+        import scoperte
+
+        scoperte.smetti_di_seguire(oggetto)
+        return risposta(f"Non seguo più '{oggetto.strip()}'.")
+
+    def seguiti(self):
+        import scoperte
+
+        o = scoperte.oggetti()
+        return risposta("Tengo d'occhio: " + ", ".join(x["nome"] for x in o) + "." if o else "Non sto seguendo nessun oggetto.")
+
+    def offerte(self, oggetto):
+        import gusti
+        import scoperte
+
+        link = scoperte.link_negozi(oggetto.strip())
+        gusti.registra(oggetto, "oggetto", 2.0)
+        r = self.msi("apri_url", {"url": link["Idealo"]}) if "msi" in self.s else {"esito": "errore"}
+        aperto = " Ho aperto il confronto prezzi su Idealo nel PC Msi." if r.get("esito") == "ok" else ""
+        return risposta(f"Non ho accesso diretto ai prezzi dei negozi.{aperto} Link: " +
+                        " · ".join(f"{k}: {v}" for k, v in link.items()), link=link)
+
+    # ------------------------------ Guide ------------------------------
+    def guida(self, argomento):
+        import gusti
+        import guide
+
+        try:
+            g = guide.crea(argomento, self.s.get("esperto"))
+        except guide.ErroreGuida as e:
+            return risposta(str(e), "incerto")
+        gusti.registra(argomento, "guida", 1.5)
+        return risposta(guide.riassunto(g), azione_pannello="guida", guida=g["id"])
+
+    def passo(self, direzione):
+        import guide
+
+        try:
+            if direzione == "resta":
+                g = guide.attuale()
+                return risposta(guide.testo_passo(g), azione_pannello="guida", guida=g["id"])
+            g, testo = guide.muovi(direzione)
+        except guide.ErroreGuida as e:
+            return risposta(str(e), "incerto")
+        return risposta(testo, azione_pannello="guida", guida=g["id"])
+
+    def materiali(self):
+        import guide
+
+        try:
+            g = guide.attuale()
+        except guide.ErroreGuida as e:
+            return risposta(str(e), "incerto")
+        return risposta("Materiali: " + (", ".join(g.get("materiali", [])) or "nessuno indicato") + ". Attrezzi: "
+                        + (", ".join(g.get("attrezzi", [])) or "nessuno indicato") + ".")
+
+    # ------------------------------ Suggerimenti dalle abitudini ------------------------------
+    def accetta_suggerimento(self):
+        import ritratto
+
+        c = ritratto.ultimo_suggerimento()
+        if not c:
+            return risposta("Non ti avevo proposto niente.")
+        r = self.esegui(c)
+        return {**r, "testo": f"Eseguo \"{c}\": " + r["testo"]}
+
+    def rifiuta_suggerimento(self):
+        import ritratto
+
+        c = ritratto.rifiuta_suggerimento()
+        return risposta("Va bene." if c else "Non ti avevo proposto niente.")

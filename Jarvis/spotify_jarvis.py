@@ -24,7 +24,8 @@ CARTELLA = os.path.dirname(os.path.abspath(__file__))
 FILE_TOKEN = os.path.join(CARTELLA, "dati", "spotify_token.json")
 API = "https://api.spotify.com/v1"
 CONTI = "https://accounts.spotify.com"
-PERMESSI = "user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-read-private"
+PERMESSI = ("user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-read-private "
+            "user-top-read user-read-recently-played")
 _attesa = {}  # state -> code_verifier
 
 
@@ -160,3 +161,16 @@ def comando(azione, valore=None):
         _api("PUT", f"/me/player/volume?volume_percent={max(0, min(100, int(valore)))}")
         return f"Volume Spotify al {int(valore)}%."
     raise ErroreSpotify("Comando Spotify sconosciuto.")
+
+
+def artisti_preferiti(quanti=10):
+    """Artisti piu' ascoltati nelle ultime settimane (permesso user-top-read)."""
+    r = _api("GET", f"/me/top/artists?time_range=short_term&limit={quanti}")
+    return [a["name"] for a in r.get("items", [])]
+
+
+def generi_preferiti(quanti=20):
+    r = _api("GET", f"/me/top/artists?time_range=medium_term&limit={quanti}")
+    from collections import Counter
+
+    return [g for g, _ in Counter(g for a in r.get("items", []) for g in a.get("genres", [])).most_common(8)]

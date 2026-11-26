@@ -340,3 +340,23 @@ a.btn { text-decoration: none; text-align: center; }
 .cv-form .campo { min-width: 180px; }
 .voce.nuovo-agenda { border-left-color: var(--secondo); }
 .badge-nuovo { background: var(--secondo); color: #000; border-radius: 4px; padding: 0 6px; font-size: 0.7rem; margin-right: 6px; }
+
+/* Per te */
+#perte { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+@media (max-width: 900px) { #perte { grid-template-columns: minmax(0, 1fr); } }
+#perte .largo-griglia { grid-column: 1 / -1; }
+.ritratto { font-size: 1.05rem; line-height: 1.5; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.chip { border: 1px solid var(--bordo); border-radius: 999px; padding: 3px 4px 3px 12px; display: inline-flex; align-items: center; gap: 4px; }
+.chip-x { background: none; border: none; color: var(--testo-2); cursor: pointer; font-size: 1rem; padding: 0 6px; }
+.chip-x:hover { color: var(--rosso); }
+.elenco { margin: 4px 0 8px 18px; padding: 0; }
+.guida { margin-top: 10px; }
+.avviso-sicurezza { border: 1px solid var(--secondo); color: var(--secondo); border-radius: var(--raggio); padding: 8px 10px; margin: 6px 0; }
+.passi-guida { padding-left: 22px; }
+.passi-guida li { margin: 6px 0; padding: 6px 8px; border-radius: var(--raggio); }
+.passi-guida li.passo-attuale { border: 1px solid var(--acc); box-shadow: var(--bagliore); }
+.passi-guida li.passo-fatto { opacity: 0.55; }
+
+.voce a:not(.btn), .sotto a, .guida a { color: var(--acc); }
+.voce a:not(.btn):visited { color: var(--acc-2); }

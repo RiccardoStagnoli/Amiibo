@@ -466,7 +466,7 @@ def _servizi():
         "eventi_oggi": gmail_reader.eventi_oggi, "evento": gmail_reader.aggiungi_evento_rapido,
         "drive_cerca": gmail_reader.cerca_drive, "teams": teams_reader.nuovi_messaggi,
         "accendi_msi": accendi_msi, "non_disturbare": non_disturbare,
-        "fine_non_disturbare": fine_non_disturbare, "riepilogo": riepilogo, "alexa": alexa,
+        "fine_non_disturbare": fine_non_disturbare, "riepilogo": riepilogo, "alexa": alexa, "esperto": esperto,
     }
 
 
@@ -481,6 +481,12 @@ def comando():
         interprete = Interprete(_servizi())
     d = request.get_json(silent=True) or {}
     r = interprete.esegui(d.get("testo", ""))
+    try:
+        import gusti
+
+        gusti.osserva_comando(d.get("testo", ""), r.get("esito"))  # impara i tuoi gusti dai comandi
+    except Exception:
+        pass
     extra.registra("comando", f"{d.get('testo', '')} -> {r['esito']}",
                    "server (voce)" if _interno() else request.remote_addr)
     if d.get("annuncia"):
@@ -578,6 +584,14 @@ def riepilogo():
             parti.append(f"GitHub: {len(n)} notifiche non lette.")
     except Exception:
         pass
+    try:
+        import scoperte
+
+        per_te, _ = scoperte.per_te(3)
+        if per_te:
+            parti.append("Per te: " + " ".join(f"{x['titolo']} ({x['fonte']})." for x in per_te))
+    except Exception:
+        pass
     oggi_iso = time.strftime("%Y-%m-%d")
     prom = [p for p in extra.promemoria() if p["quando"][:10] == oggi_iso]
     if prom:
@@ -597,8 +611,32 @@ def pianificatore():
     """Ogni 20 secondi: promemoria scaduti, fine non disturbare, riepilogo quotidiano."""
     ultimo_riepilogo = None
     ultimo_controllo_compiti = 0.0
+    ultima_ora_suggerita = None
+    ultimo_controllo_oggetti = 0.0
     while True:
         try:
+            ora_corrente = time.strftime("%Y-%m-%d %H")
+            if ora_corrente != ultima_ora_suggerita and int(time.strftime("%M")) >= 2:
+                ultima_ora_suggerita = ora_corrente
+                import ritratto
+
+                try:
+                    a = ritratto.suggerimento_adesso()
+                    if a:
+                        annuncia(f"Di solito a quest'ora fai \"{a['comando']}\". Vuoi che lo faccia? Di' 'sì, fallo' oppure 'no grazie'.")
+                except Exception as e:
+                    print("Suggerimenti:", e)
+            if time.time() - ultimo_controllo_oggetti > 3 * 3600:
+                ultimo_controllo_oggetti = time.time()
+                import scoperte
+
+                try:
+                    for n in scoperte.novita_oggetti()[:5]:
+                        testo = f"Novità su {n['oggetto']}: {n['titolo']} ({n['fonte']})."
+                        annuncia(testo)
+                        _a_me("🔎 " + testo + " " + n["link"])
+                except Exception as e:
+                    print("Oggetti seguiti:", e)
             minuti = getattr(config, "COMPITI_OGNI_MINUTI", 15)
             if minuti and time.time() - ultimo_controllo_compiti > minuti * 60:
                 import agenda
@@ -699,6 +737,9 @@ def api_memoria_documento():
         return jsonify(errore=f"Impossibile leggere il file: {e}"), 400
     esperto.ricarica()
     extra.registra("memoria", f"documento: {nome}", request.remote_addr)
+    import gusti
+
+    gusti.registra(nome.replace("_", " "), "documento", 1.0)
     return jsonify(ok=True, nome=nome, caratteri=caratteri)
 
 
@@ -769,6 +810,9 @@ def api_media():
     except ValueError as e:
         return jsonify(errore=str(e)), 400
     extra.registra("media", f"{m['tipo']}: {descrizione}", request.remote_addr)
+    import gusti
+
+    gusti.registra(descrizione, "foto", 0.8)
     return jsonify(m)
 
 
@@ -933,6 +977,87 @@ def api_agenda_nuovi():
 
     nuovi = agenda.nuovi_da_riferire(segna=request.args.get("segna", "1") == "1")
     return jsonify([{**i, "frase": agenda.frase(i)} for i in nuovi])
+
+
+# ============================== PER TE ==============================
+@app.route("/api/pertete")
+@richiede_accesso
+def api_pertete():
+    import gusti
+    import guide
+    import ritratto
+    import scoperte
+
+    testo, dati = ritratto.ritratto()
+    return jsonify(ritratto=testo, abitudini=dati.get("abitudini", []), profilo=gusti.profilo(),
+                   oggetti=scoperte.oggetti(), guide=guide.elenco())
+
+
+@app.route("/api/pertete/scoperte")
+@richiede_accesso
+def api_pertete_scoperte():
+    import scoperte
+
+    lista, avvisi = scoperte.per_te(15)
+    oggetti = {o["nome"]: scoperte.link_negozi(o["nome"]) for o in scoperte.oggetti()}
+    return jsonify(scoperte=lista, avvisi=avvisi, negozi=oggetti)
+
+
+@app.route("/api/pertete/<azione>", methods=["POST"])
+@richiede_accesso
+def api_pertete_azione(azione):
+    import gusti
+    import scoperte
+
+    d = request.get_json(silent=True) or {}
+    testo = (d.get("testo") or "").strip()
+    if azione == "feedback":
+        gusti.feedback(d.get("link", ""), d.get("titolo", ""), 1 if d.get("voto", 0) > 0 else -1)
+    elif azione in ("piace", "non_piace", "dimentica", "segui", "smetti") and not testo:
+        return jsonify(errore=errore_utente("Scrivi qualcosa, non il vuoto.")), 400
+    elif azione == "piace":
+        gusti.mi_piace(testo)
+    elif azione == "non_piace":
+        gusti.non_mi_piace(testo)
+    elif azione == "dimentica":
+        gusti.dimentica_interesse(testo)
+    elif azione == "segui":
+        scoperte.segui(testo)
+    elif azione == "smetti":
+        scoperte.smetti_di_seguire(testo)
+    elif azione == "cancella_tutto":
+        if d.get("conferma") is not True:
+            return jsonify(errore="Serve conferma."), 400
+        gusti.cancella_tutto()
+        extra.registra("gusti", "profilo cancellato", request.remote_addr)
+    else:
+        abort(404)
+    return jsonify(ok=True)
+
+
+@app.route("/api/guide/<id_guida>")
+@richiede_accesso
+def api_guida(id_guida):
+    import guide
+
+    try:
+        g = guide.carica(id_guida)
+    except guide.ErroreGuida as e:
+        return jsonify(errore=str(e)), 404
+    guide.imposta_attuale(g["id"])
+    return jsonify(g)
+
+
+@app.route("/api/guide/muovi", methods=["POST"])
+@richiede_accesso
+def api_guida_muovi():
+    import guide
+
+    try:
+        g, testo = guide.muovi((request.get_json(silent=True) or {}).get("direzione", "avanti"))
+    except guide.ErroreGuida as e:
+        return jsonify(errore=str(e)), 400
+    return jsonify(guida=g, testo=testo)
 
 
 # ================================ COMPITI ================================

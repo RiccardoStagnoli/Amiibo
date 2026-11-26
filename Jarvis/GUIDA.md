@@ -600,6 +600,34 @@ Amazon **non offre un modo ufficiale** per comandare Alexa da un programma perso
 
 **Limiti:** non ufficiale, Amazon può cambiarlo. L'accesso ogni tanto potrebbe essere da rifare (pagina 3456). Funzionamento con il tuo account **non verificato**.
 
+## Fase 30 – Per te: gusti, scoperte, guide e ritratto
+
+Jarvis impara chi sei dai **dati che vede**: cosa ascolti, cosa cerchi, quali giochi scarichi, che domande fai, che guide chiedi, che documenti e foto carichi, a che ora fai le cose, cosa hai in agenda. Tutto resta sul PC server (`C:\Jarvis\dati`). Nella sezione **Per te** puoi vederlo, correggerlo o cancellarlo con un clic.
+
+**Gusti**
+- Li impara da solo. Ogni interesse perde peso col tempo se non torna: i gusti cambiano.
+- Puoi dirli tu: `mi piace la MotoGP`, `non mi piace il calcio` (non te lo proporrà più), `i miei gusti`.
+- 👍 / 👎 sulle scoperte affinano il profilo.
+
+**Scoperte** (Google News, gratuito):
+- `novità per me`: notizie sui tuoi interessi più forti. Ogni scoperta dice **perché** te la propone.
+- `tienimi d'occhio Honda CB500`: ogni 3 ore controlla le novità su quell'oggetto (uscite, recensioni, prezzi annunciati) e ti avvisa a voce e su WhatsApp.
+- `cerca offerte per Honda CB500`: Jarvis **non ha accesso ai prezzi dei negozi** (le loro API non sono gratuite). Prepara i link di ricerca su Amazon, eBay, Subito e Idealo, e apre Idealo sul Msi se è acceso.
+- Il **riepilogo quotidiano** include 3 scoperte "Per te".
+
+**Costruiscilo con me** (guide passo passo):
+- `come si costruisce un aquilone`, `spiegami come costruire una mensola`, `come si fa un forno solare`.
+- Jarvis cerca fonti nei **tuoi documenti** (sezione Memoria) e su **Wikipedia**, poi **Ollama** (Fase 6) scrive la guida: materiali, attrezzi, sicurezza, passi, consigli. Quello che non è nelle fonti viene marcato *(da verificare)*.
+- Per guide migliori: `MODELLO_GUIDE = "qwen2.5:7b"` in `config.py` (circa 5 GB; *dati insufficienti per indicarti la RAM minima esatta*, su PC con 8 GB può essere molto lento). Senza Ollama Jarvis ti mostra le fonti invece della guida.
+- Poi segui un passo alla volta, anche a voce: `passo successivo`, `passo precedente`, `ripeti il passo`, `materiali`.
+- Lavori pericolosi (230 V, gas, saldatura, freni…): avviso di sicurezza in cima. Guide su armi, esplosivi o sostanze pericolose: **rifiutate**.
+
+**Ritratto e abitudini**
+- `chi sono` / `cosa sai di me`: interessi principali, cosa ti interessa di più ultimamente, orari in cui sei più attivo, cosa chiedi più spesso, abitudini, materie con più impegni, artisti più ascoltati su Spotify (dopo aver ricollegato Spotify).
+- **Abitudini**: un comando ripetuto nella stessa fascia oraria in almeno 3 giorni diversi diventa un'abitudine. A quell'ora Jarvis te lo propone: *"Di solito a quest'ora fai ... Vuoi che lo faccia?"*. Rispondi `sì, fallo` oppure `no grazie`; dopo 3 rifiuti smette di proportelo. Per disattivare: `SUGGERIMENTI_ABITUDINI = False`.
+
+**Limite onesto:** Jarvis non può "conoscerti più di quanto ti conosci tu". Vede solo ciò che fai con lui e ciò che gli dici, e lo riassume con statistiche. Più lo usi e più gli dici, più è preciso.
+
 ## Il manuale di meccanica
 
 - **Titolo:** *La Vettura Automobile – Sue parti, suo funzionamento*

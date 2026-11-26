@@ -140,6 +140,12 @@ Spunta ogni riga quando l'hai fatta.
   - aggiungi il bot al tuo server;
   - in `config.py` metti il token e gli ID dei canali.
 
+## E8. Per te (Fase 30)
+
+- [ ] **26v.** Sezione **Per te**: scrivi 5–10 cose che ti piacciono e gli oggetti da tenere d'occhio.
+- [ ] **26w.** Per le guide passo passo installa Ollama ed esegui `ollama pull qwen2.5:7b`, poi imposta `MODELLO_GUIDE = "qwen2.5:7b"`. Se il PC è lento, lascia vuoto (usa gemma2:2b).
+- [ ] **26x.** Se avevi già collegato Spotify, rifai l'accesso da http://127.0.0.1:8080/spotify/accedi (nuovo permesso per gli artisti preferiti).
+
 ## F. Telefono Vodafone (non automatizzabile gratis)
 
 - [ ] **27.** Facoltativo: chiama il **42020** e registra il saluto della segreteria: *"Riccardo non è al momento raggiungibile..."*.

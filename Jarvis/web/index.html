@@ -50,6 +50,7 @@
   <button data-sezione="centrale" class="attivo">Centrale</button>
   <button data-sezione="whatsapp">WhatsApp</button>
   <button data-sezione="gmail">Google</button>
+  <button data-sezione="perte">Per te</button>
   <button data-sezione="compiti">Compiti</button>
   <button data-sezione="teams">Teams</button>
   <button data-sezione="casa">Casa</button>
@@ -151,6 +152,50 @@
         <button class="btn pericolo" data-azione="cestina">Sposta nel cestino</button>
       </div>
       <div class="azioni"><button class="btn piccolo pericolo" id="btn-svuota">Svuota cestino Gmail (definitivo)</button></div>
+    </div>
+  </section>
+
+  <!-- PER TE -->
+  <section id="perte" class="sezione">
+    <div class="pannello largo-griglia">
+      <h2>Cosa so di te</h2>
+      <p id="ritratto-testo" class="ritratto">...</p>
+      <div class="azioni"><button class="btn sec" id="btn-leggi-ritratto">Leggimelo</button></div>
+      <h3>Abitudini</h3>
+      <ul id="abitudini" class="elenco"></ul>
+      <p class="nota">Statistiche sui dati che Jarvis vede (comandi, musica, ricerche, agenda): restano sul tuo PC server.</p>
+    </div>
+    <div class="pannello">
+      <h2>I tuoi gusti</h2>
+      <div id="interessi" class="chips"></div>
+      <p id="non-piace" class="nota"></p>
+      <form id="form-piace" class="composer">
+        <input id="piace-testo" class="campo" placeholder="Es. MotoGP, Queen, stampanti 3D" autocomplete="off">
+        <button class="btn" type="submit">Mi piace</button>
+        <button class="btn sec" type="button" id="btn-non-piace">Non mi piace</button>
+      </form>
+      <h3>Oggetti che segui</h3>
+      <div id="oggetti-seguiti" class="chips"></div>
+      <form id="form-segui" class="composer">
+        <input id="segui-testo" class="campo" placeholder="Es. Honda CB500, RTX 5070, Rabbit R1" autocomplete="off">
+        <button class="btn" type="submit">Tieni d'occhio</button>
+      </form>
+      <div class="azioni"><button class="btn piccolo pericolo" id="btn-cancella-profilo">Cancella tutto quello che sai di me</button></div>
+    </div>
+    <div class="pannello">
+      <h2>Scoperte per te</h2>
+      <div class="azioni"><button class="btn" id="btn-scoperte">Cerca novità</button></div>
+      <div id="lista-scoperte" class="lista"></div>
+    </div>
+    <div class="pannello largo-griglia">
+      <h2>Costruiscilo con me</h2>
+      <form id="form-guida" class="composer">
+        <input id="guida-testo" class="campo" placeholder="Cosa vuoi costruire? Es. un aquilone, una mensola, un robot con Arduino" autocomplete="off">
+        <button class="btn" type="submit">Guida passo passo</button>
+      </form>
+      <div id="guida-zona" class="guida" hidden></div>
+      <h3>Guide salvate</h3>
+      <div id="lista-guide" class="lista compatta"></div>
     </div>
   </section>
 
