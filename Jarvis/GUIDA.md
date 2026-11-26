@@ -334,6 +334,29 @@ Regola del 90%: se il nome del programma o del gioco non corrisponde almeno al 9
 3. Nel BIOS del Msi attiva la riattivazione da rete. Il nome dell'opzione cambia da scheda madre a scheda madre (es. "Wake On LAN", "Resume by PCI-E Device"): *dati insufficienti per indicarti il nome esatto sul tuo modello.*
 4. Se non si accende da spento, disattiva l'**Avvio rapido** di Windows: Pannello di controllo → Opzioni risparmio energia → Specifica comportamento pulsanti di alimentazione → togli "Attiva avvio rapido".
 
+## Fase 17 – Jarvis impara da te (sezione Memoria)
+
+Jarvis non "riaddestra" un'intelligenza artificiale: **salva** le informazioni che gli dai (sul server, cartella `C:\Jarvis\dati`) e le **usa** per rispondere, sempre con la regola del 90%. Più gli insegni, più risponde.
+
+**1. Fatti** – barra comandi, a voce o sezione Memoria:
+- `ricorda che la mia moto è una Honda CB500 del 2019` → poi `qual è la mia moto?` risponde *"Dalla memoria: ..."*.
+- `impara: il prof di matematica si chiama Rossi` · `cosa sai del prof di matematica` · `cosa hai imparato` · `dimentica moto`.
+- Le domande **personali** (con *mio, mia, me, io, ho, sono*) cercano **solo** nella memoria, mai nei manuali: Jarvis non risponde "la tua moto" leggendo il libro del 1907.
+
+**2. Documenti** – sezione Memoria → **Carica**: PDF, Word (.docx), .txt, .md, fino a 25 MB.
+- Esempi: libretto d'uso e manutenzione della tua moto o auto, appunti, programma delle verifiche.
+- Da quel momento le domande (che finiscono con `?`, oppure `domanda: ...`) cercano anche lì e citano la fonte (nome del file e pagina).
+- I PDF fatti di **sole immagini** (scansioni) non contengono testo leggibile: Jarvis lo segnala.
+
+**3. Comandi nuovi** – `quando dico buongiorno mamma intendi scrivi a Mamma: buongiorno!`
+- Da allora basta dire "buongiorno mamma".
+- Jarvis accetta solo comandi che esistono davvero; se sbagli, te lo dice a modo suo.
+- Per cancellarlo: `dimentica il comando buongiorno mamma`, oppure **Elimina** nel pannello.
+
+**4. Comandi non capiti** – ogni frase che Jarvis non capisce finisce nella lista *"Comandi e domande che non ho capito"*. Premi **Insegna** e scrivi a quale comando corrisponde. Così Jarvis si adatta al tuo modo di parlare.
+
+Per fare una copia di sicurezza di tutto ciò che Jarvis ha imparato, copia la cartella `C:\Jarvis\dati` su una chiavetta o su Google Drive.
+
 ## Il manuale di meccanica
 
 - **Titolo:** *La Vettura Automobile – Sue parti, suo funzionamento*

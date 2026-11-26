@@ -279,6 +279,7 @@ function mostraSezione(nome) {
   if (nome === 'impostazioni') { caricaImpostazioni(); caricaRegistro(); }
   if (nome === 'gmail') caricaSpazio();
   if (nome === 'msi') aggiornaSistema();
+  if (nome === 'memoria') caricaMemoria();
 }
 
 setInterval(() => { $('#orologio').textContent = new Date().toLocaleTimeString('it-IT'); }, 1000);
@@ -849,6 +850,78 @@ $('#form-meccanica').addEventListener('submit', async (e) => {
     const senzaAI = r.testo.startsWith('(Ollama');
     parla(r.fonti && r.fonti.length ? F.manuale() + ' ' + (senzaAI ? r.testo.split('\n').slice(2, 6).join(' ').slice(0, 600) : r.testo) : r.testo);
   } catch (err) { box.replaceChildren(el('p', { class: 'errore' }, err.message)); }
+});
+
+// =========================================================================
+// MEMORIA: fatti, documenti, comandi insegnati, non capiti
+// =========================================================================
+async function eliminaMemoria(tipo, id) {
+  try { await api('/api/memoria/elimina', { tipo, id }); caricaMemoria(); } catch (e) { parla(F.errore(e.message), true); }
+}
+
+function rigaMemoria(titolo, sotto, tipo, id, extraBtn) {
+  return el('div', { class: 'voce' },
+    el('div', { class: 'titolo' }, el('span', {}, titolo),
+      el('span', { class: 'azioni', style: 'margin:0' }, extraBtn || null,
+        el('button', { class: 'btn piccolo sec', onclick: () => eliminaMemoria(tipo, id) }, 'Elimina'))),
+    sotto ? el('div', { class: 'sotto' }, sotto) : null);
+}
+
+async function caricaMemoria() {
+  try {
+    const m = await api('/api/memoria');
+    const vuoto = (t) => [el('p', { class: 'nota' }, t)];
+    $('#lista-fatti').replaceChildren(...(m.fatti.length ? m.fatti.slice().reverse().map((f) =>
+      rigaMemoria(f.testo, dataOra(f.ora), 'fatto', f.id)) : vuoto('Nessun fatto memorizzato.')));
+    $('#lista-documenti').replaceChildren(...(m.documenti.length ? m.documenti.map((d) =>
+      rigaMemoria(d.nome, `${d.kb || "<1"} KB di testo · ${dataOra(d.ora)}`, 'documento', d.nome)) : vuoto('Nessun documento.')));
+    $('#lista-alias').replaceChildren(...(m.comandi.length ? m.comandi.map((a) =>
+      rigaMemoria(`"${a.frase}"`, `→ ${a.comando}`, 'comando', a.id)) : vuoto('Nessun comando insegnato.')));
+    $('#lista-non-capiti').replaceChildren(...(m.non_capiti.length ? m.non_capiti.slice().reverse().map((x) =>
+      rigaMemoria(x.frase, `${x.volte} volte · ultima ${dataOra(x.ora)}`, 'non_capito', x.id,
+        el('button', {
+          class: 'btn piccolo',
+          onclick: () => { $('#alias-frase').value = x.frase; $('#alias-comando').focus(); $('#alias-comando').scrollIntoView({ behavior: 'smooth' }); },
+        }, 'Insegna'))) : vuoto('Niente: ho capito tutto.')));
+  } catch (e) { $('#lista-fatti').replaceChildren(el('p', { class: 'errore' }, e.message)); }
+}
+
+$('#form-fatto').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const testo = $('#testo-fatto').value.trim();
+  try {
+    const r = await api('/api/memoria/fatto', { testo });
+    $('#testo-fatto').value = '';
+    parla(r.nuovo ? 'Memorizzato.' : 'Lo sapevo già.');
+    caricaMemoria();
+  } catch (err) { parla(err.message, true); suono('errore'); }
+});
+
+$('#form-alias').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    await api('/api/memoria/comando', { frase: $('#alias-frase').value, comando: $('#alias-comando').value });
+    parla(`Imparato: quando dici "${$('#alias-frase').value.trim()}" eseguo "${$('#alias-comando').value.trim()}".`);
+    $('#alias-frase').value = ''; $('#alias-comando').value = '';
+    caricaMemoria();
+  } catch (err) { parla(err.message, true); suono('errore'); }
+});
+
+$('#form-documento').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const file = $('#file-documento').files[0];
+  if (!file) { parla(rimprovero('Non hai scelto nessun file, genio.', 'Nessun file scelto.'), true); suono('errore'); return; }
+  const dati = new FormData();
+  dati.append('file', file);
+  parla('Leggo il documento...');
+  try {
+    const r = await fetch('/api/memoria/documento', { method: 'POST', body: dati });
+    const corpo = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(corpo.errore || `Errore ${r.status}`);
+    parla(`Documento ${corpo.nome} imparato: ${corpo.caratteri} caratteri di testo.`);
+    $('#file-documento').value = '';
+    caricaMemoria();
+  } catch (err) { parla(err.message, true); suono('errore'); }
 });
 
 // =========================================================================

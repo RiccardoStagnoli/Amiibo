@@ -48,6 +48,7 @@
   <button data-sezione="teams">Teams</button>
   <button data-sezione="msi">Msi</button>
   <button data-sezione="meccanica">Meccanica</button>
+  <button data-sezione="memoria">Memoria</button>
   <button data-sezione="impostazioni">Impostazioni</button>
 </nav>
 
@@ -182,6 +183,43 @@
         <button class="btn" type="submit">Chiedi</button>
       </form>
       <div id="risposta-meccanica" class="risposta"></div>
+    </div>
+  </section>
+
+  <!-- MEMORIA: cio' che Jarvis impara -->
+  <section id="memoria" class="sezione">
+    <div class="pannello">
+      <h2>Insegna un fatto</h2>
+      <p class="nota">Esempi: "La mia moto è una Honda CB500 del 2019", "Il prof di matematica è Rossi", "Il mio gruppo sanguigno è A+". Poi chiedi: "qual è la mia moto?".</p>
+      <form id="form-fatto" class="composer">
+        <input id="testo-fatto" class="campo" placeholder="Scrivi un fatto..." autocomplete="off">
+        <button class="btn" type="submit">Memorizza</button>
+      </form>
+      <div id="lista-fatti" class="lista compatta"></div>
+    </div>
+    <div class="pannello">
+      <h2>Documenti</h2>
+      <p class="nota">Carica PDF, Word (.docx), .txt o .md (max 25 MB): manuale della tua moto o auto, appunti, programmi delle materie... Jarvis li usa per rispondere. I PDF fatti di sole scansioni non sono leggibili.</p>
+      <form id="form-documento" class="composer">
+        <input id="file-documento" class="campo" type="file" accept=".pdf,.docx,.txt,.md">
+        <button class="btn" type="submit">Carica</button>
+      </form>
+      <div id="lista-documenti" class="lista compatta"></div>
+    </div>
+    <div class="pannello">
+      <h2>Comandi insegnati</h2>
+      <p class="nota">Una tua frase che esegue un comando esistente. Es. frase "buongiorno mamma" → comando "scrivi a Mamma: buongiorno!".</p>
+      <form id="form-alias" class="composer">
+        <input id="alias-frase" class="campo" placeholder="Quando dico..." autocomplete="off">
+        <input id="alias-comando" class="campo" placeholder="...esegui questo comando" autocomplete="off">
+        <button class="btn" type="submit">Insegna</button>
+      </form>
+      <div id="lista-alias" class="lista compatta"></div>
+    </div>
+    <div class="pannello">
+      <h2>Comandi e domande che non ho capito</h2>
+      <p class="nota">Insegnami cosa significano: diventano comandi nuovi.</p>
+      <div id="lista-non-capiti" class="lista compatta"></div>
     </div>
   </section>
 

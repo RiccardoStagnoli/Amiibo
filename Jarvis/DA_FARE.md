@@ -89,6 +89,14 @@ Spunta ogni riga quando l'hai fatta.
   - attiva Wake-on-LAN in Windows e nel BIOS.
 - [ ] **26.** Ogni tanto controlla il **Registro attività** (Impostazioni) per verificare gli accessi.
 
+## E2. Insegnare a Jarvis (Fase 17)
+
+- [ ] **26b.** Sezione **Memoria** del pannello:
+  - insegna i primi fatti (moto, auto, prof, orari);
+  - carica il libretto della tua moto o auto in PDF.
+- [ ] **26c.** Ogni settimana controlla *"Comandi e domande che non ho capito"* e premi **Insegna**.
+- [ ] **26d.** Fai ogni tanto una copia della cartella `C:\Jarvis\dati`.
+
 ## F. Telefono Vodafone (non automatizzabile gratis)
 
 - [ ] **27.** Facoltativo: chiama il **42020** e registra il saluto della segreteria: *"Riccardo non è al momento raggiungibile..."*.

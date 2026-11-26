@@ -21,6 +21,7 @@ from flask import Flask, abort, jsonify, redirect, request, send_from_directory,
 
 import config
 import extra
+import memoria
 import whatsapp_reader
 from comandi import Interprete
 from meccanica import EspertoMeccanica
@@ -449,7 +450,7 @@ def _servizi():
     import teams_reader
 
     return {
-        "msi": msi.invia, "wa": wa, "meccanica": esperto.rispondi, "meteo": meteo,
+        "msi": msi.invia, "wa": wa, "meccanica": esperto.rispondi, "chiedi": esperto.rispondi, "ricarica": esperto.ricarica, "meteo": meteo,
         "gmail_lista": lambda q: gmail_reader.elenca_email(q, config.EMAIL_DA_MOSTRARE),
         "gmail_analizza": gmail_pulizia.analizza, "spazio": gmail_reader.spazio_account,
         "eventi_oggi": gmail_reader.eventi_oggi, "evento": gmail_reader.aggiungi_evento_rapido,
@@ -593,6 +594,78 @@ def pianificatore():
         except Exception as e:
             print("Pianificatore:", e)
         time.sleep(20)
+
+
+# ================================ MEMORIA ================================
+app.config["MAX_CONTENT_LENGTH"] = (memoria.MAX_MB + 1) * 1024 * 1024
+
+
+@app.route("/api/memoria")
+@richiede_accesso
+def api_memoria():
+    return jsonify(fatti=memoria.fatti(), comandi=memoria.alias(), documenti=memoria.documenti(),
+                   non_capiti=memoria.non_capiti())
+
+
+@app.route("/api/memoria/fatto", methods=["POST"])
+@richiede_accesso
+def api_memoria_fatto():
+    testo = ((request.get_json(silent=True) or {}).get("testo") or "").strip()
+    if len(testo.split()) < 2:
+        return jsonify(errore=errore_utente("Scrivi un fatto intero, non una parola.")), 400
+    f = memoria.aggiungi_fatto(testo)
+    esperto.ricarica()
+    extra.registra("memoria", f"fatto: {testo}", request.remote_addr)
+    return jsonify(ok=True, nuovo=f is not None)
+
+
+@app.route("/api/memoria/comando", methods=["POST"])
+@richiede_accesso
+def api_memoria_comando():
+    global interprete
+    d = request.get_json(silent=True) or {}
+    frase, comando = (d.get("frase") or "").strip(), (d.get("comando") or "").strip()
+    if interprete is None:
+        interprete = Interprete(_servizi())
+    if not frase or not comando:
+        return jsonify(errore=errore_utente("Servono sia la frase sia il comando.")), 400
+    if not interprete.riconosce(comando):
+        return jsonify(errore=errore_utente(f"Il comando '{comando}' non esiste. Scrivi 'aiuto' per l'elenco.")), 400
+    memoria.aggiungi_alias(frase, comando)
+    extra.registra("memoria", f"comando: {frase} -> {comando}", request.remote_addr)
+    return jsonify(ok=True)
+
+
+@app.route("/api/memoria/documento", methods=["POST"])
+@richiede_accesso
+def api_memoria_documento():
+    f = request.files.get("file")
+    if not f or not f.filename:
+        return jsonify(errore=errore_utente("Non hai scelto nessun file.")), 400
+    try:
+        nome, caratteri = memoria.aggiungi_documento(f.filename, f.read())
+    except ValueError as e:
+        return jsonify(errore=str(e)), 400
+    except Exception as e:
+        return jsonify(errore=f"Impossibile leggere il file: {e}"), 400
+    esperto.ricarica()
+    extra.registra("memoria", f"documento: {nome}", request.remote_addr)
+    return jsonify(ok=True, nome=nome, caratteri=caratteri)
+
+
+@app.route("/api/memoria/elimina", methods=["POST"])
+@richiede_accesso
+def api_memoria_elimina():
+    d = request.get_json(silent=True) or {}
+    tipo, chiave = d.get("tipo"), str(d.get("id", ""))
+    azioni = {"fatto": memoria.elimina_fatto, "comando": memoria.elimina_alias,
+              "documento": memoria.elimina_documento, "non_capito": memoria.elimina_non_capito}
+    if tipo not in azioni:
+        return jsonify(errore="Tipo non valido"), 400
+    azioni[tipo](chiave)
+    if tipo in ("fatto", "documento"):
+        esperto.ricarica()
+    return jsonify(ok=True)
 
 
 @app.route("/api/promemoria")

@@ -282,3 +282,12 @@ body.compatto .pannello { padding: 10px; }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+/* Sezione Memoria */
+#form-alias { flex-wrap: wrap; }
+#form-alias .campo { min-width: 180px; }
+input[type=file].campo { padding: 7px; }
+input[type=file].campo::file-selector-button {
+  background: transparent; color: var(--acc); border: 1px solid var(--acc); border-radius: var(--raggio);
+  padding: 4px 10px; margin-right: 10px; font-family: "Orbitron", sans-serif; font-size: 0.6rem; cursor: pointer;
+}

@@ -26,6 +26,9 @@ import config
 
 CARTELLA = os.path.dirname(os.path.abspath(__file__))
 CARTELLA_MANUALI = os.path.join(CARTELLA, "manuali")
+# Documenti caricati dall'utente dal pannello (sezione Memoria), convertiti in .txt
+CARTELLA_DOCUMENTI = os.path.join(CARTELLA, "dati", "documenti")
+NOME_MEMORIA = "memoria"
 
 PAROLE_VUOTE = set("""
 a ad al allo alla ai agli alle all anche come con col coi da dal dallo dalla dai dagli dalle
@@ -45,6 +48,12 @@ SINONIMI = {
     "telaio": ["chassis"],
     "chassis": ["telaio"],
 }
+
+# Parole tipiche delle domande, che non devono per forza comparire nella risposta.
+PAROLE_DOMANDA = set("""
+come cosa serve sai sapere ricordi ricorda dimmi dici spiega spiegami descrivi parlami
+quanto quanta quanti quante qual quale quali chi dove quando perche perché funziona funzionano
+""".split())
 
 RX_TITOLO = re.compile(r"^[A-ZÀÈÉÌÒÙ][A-ZÀÈÉÌÒÙ .,'’—\-]{5,}$")
 RX_SOTTOTITOLO = re.compile(r"^[A-ZÀ-Ù][^—\d]{2,60}\.$")
@@ -75,7 +84,9 @@ def _parole(testo, con_sinonimi=False):
 
 def _carica_brani(lunghezza_massima=1100):
     brani = []
-    for percorso in sorted(glob.glob(os.path.join(CARTELLA_MANUALI, "*.txt"))):
+    percorsi = sorted(glob.glob(os.path.join(CARTELLA_MANUALI, "*.txt")))
+    percorsi += sorted(glob.glob(os.path.join(CARTELLA_DOCUMENTI, "*.txt")))
+    for percorso in percorsi:
         nome_manuale = os.path.splitext(os.path.basename(percorso))[0]
         with open(percorso, encoding="utf-8", errors="replace") as f:
             righe = f.read().replace("\r\n", "\n").split("\n")
@@ -122,6 +133,11 @@ def _carica_brani(lunghezza_massima=1100):
             if not pulita:
                 chiudi_paragrafo()
                 continue
+            if re.fullmatch(r"PAGINA \d+", pulita):  # segnaposto dei PDF caricati
+                chiudi_paragrafo()
+                chiudi_brano()
+                sezione = pulita.capitalize()
+                continue
             if RX_TITOLO.match(pulita) and not re.search(r"[a-z]", pulita):
                 chiudi_paragrafo()
                 chiudi_brano()
@@ -134,12 +150,21 @@ def _carica_brani(lunghezza_massima=1100):
 
 
 class EspertoMeccanica:
+    """Motore di ricerca su: manuali, documenti caricati dall'utente e fatti insegnati (memoria)."""
+
     def __init__(self):
-        self.brani = _carica_brani()
-        if not self.brani:
-            raise FileNotFoundError(
-                "Nessun manuale trovato nella cartella:\n  " + CARTELLA_MANUALI
-            )
+        self.ricarica()
+
+    def ricarica(self):
+        """Rilegge manuali, documenti e fatti: da chiamare dopo ogni cosa nuova imparata."""
+        import memoria
+
+        brani = _carica_brani()
+        for f in memoria.fatti():
+            brani.append({"manuale": NOME_MEMORIA, "sezione": "Fatto insegnato", "testo": f["testo"], "id": f["id"]})
+        if not brani:
+            raise FileNotFoundError("Nessun manuale trovato nella cartella:\n  " + CARTELLA_MANUALI)
+        self.brani = brani
         self._documenti = [
             Counter(_parole(b["sezione"] + " " + b["testo"])) for b in self.brani
         ]
@@ -156,12 +181,15 @@ class EspertoMeccanica:
     def manuali_caricati(self):
         return sorted({b["manuale"] for b in self.brani})
 
-    def cerca(self, domanda, quanti=4):
-        """Ricerca BM25: restituisce i brani piu' pertinenti con il loro punteggio."""
+    def cerca(self, domanda, quanti=4, solo=None):
+        """Ricerca BM25: restituisce i brani piu' pertinenti con il loro punteggio.
+        solo: nome di una fonte (es. "memoria") per cercare solo li'."""
         termini = set(_parole(domanda, con_sinonimi=True))
         k1, b = 1.5, 0.75
         punteggi = []
         for i, doc in enumerate(self._documenti):
+            if solo and self.brani[i]["manuale"] != solo:
+                continue
             s = 0.0
             for t in termini:
                 tf = doc.get(t, 0)
@@ -179,7 +207,7 @@ class EspertoMeccanica:
         gruppi = []
         for p in re.findall(r"[a-zA-ZÀ-ÿ]+", domanda):
             n = _normalizza(p)
-            if len(n) < 3 or n in PAROLE_VUOTE or n in ("come", "cosa", "serve"):
+            if len(n) < 3 or n in PAROLE_VUOTE or n in PAROLE_DOMANDA:
                 continue
             gruppi.append({_radice(n)} | {_radice(s) for s in SINONIMI.get(n, [])})
         if not gruppi:
@@ -189,20 +217,25 @@ class EspertoMeccanica:
             presenti.update(_parole(b["sezione"] + " " + b["testo"]))
         return sum(1 for g in gruppi if g & presenti) / len(gruppi)
 
-    def rispondi(self, domanda):
+    def rispondi(self, domanda, solo=None):
         """
         Restituisce (testo_risposta, brani_usati).
-        La risposta si basa solo sui brani del manuale e viene data solo se
-        almeno il 90% dei termini della domanda compare nel manuale.
+        La risposta si basa solo su manuali, documenti e fatti insegnati e viene
+        data solo se almeno il 90% dei termini della domanda vi compare.
         """
-        brani = self.cerca(domanda, quanti=config.BRANI_PER_RISPOSTA)
+        brani = self.cerca(domanda, quanti=config.BRANI_PER_RISPOSTA, solo=solo)
         if not brani:
-            return ("Il manuale non contiene informazioni su questo argomento.", [])
+            return ("Dati insufficienti per verificare: non ho informazioni su questo argomento.", [])
         soglia = getattr(config, "SOGLIA_CERTEZZA", 0.90)
         cop = self.copertura(domanda, brani)
         if cop < soglia:
-            return (f"Dati insufficienti per verificare: il manuale copre solo il {round(cop * 100)}% "
+            return (f"Dati insufficienti per verificare: le mie fonti coprono solo il {round(cop * 100)}% "
                     "dei termini della domanda. Non rispondo.", [])
+
+        # Se la risposta sta tutta nei fatti che mi hai insegnato, li riporto cosi' come sono.
+        fatti = [b for b in brani if b["manuale"] == NOME_MEMORIA]
+        if fatti and self.copertura(domanda, fatti) >= soglia:
+            return ("Dalla memoria: " + " ".join(f["testo"] for f in fatti[:3]), fatti[:3])
 
         risposta_ai = _chiedi_a_ollama(domanda, brani)
         if risposta_ai:
@@ -210,7 +243,7 @@ class EspertoMeccanica:
 
         testo = [
             "(Ollama non attivo o modello '" + config.MODELLO_OLLAMA + "' non scaricato: "
-            "ecco i passaggi del manuale piu' pertinenti)\n"
+            "ecco i passaggi piu' pertinenti delle mie fonti)\n"
         ]
         for n, br in enumerate(brani, 1):
             testo.append(f"[{n}] Sezione: {br['sezione']}\n{br['testo']}\n")
@@ -219,16 +252,16 @@ class EspertoMeccanica:
 
 def _chiedi_a_ollama(domanda, brani):
     estratti = "\n\n".join(
-        f"[{n}] (Sezione: {b['sezione']})\n{b['testo']}" for n, b in enumerate(brani, 1)
+        f"[{n}] (Fonte: {b['manuale']}, sezione: {b['sezione']})\n{b['testo']}" for n, b in enumerate(brani, 1)
     )
     istruzioni = (
         "Sei Jarvis, assistente personale. Rispondi in italiano, in modo serio, preciso e conciso: "
         "niente complimenti, niente giri di parole, niente frasi di cortesia. "
-        "Usa ESCLUSIVAMENTE le informazioni contenute negli ESTRATTI DEL MANUALE forniti. "
+        "Usa ESCLUSIVAMENTE le informazioni contenute negli ESTRATTI forniti (manuali, documenti dell'utente, fatti insegnati). "
         "Non aggiungere conoscenze esterne. Se gli estratti non contengono la risposta, "
-        "rispondi esattamente: 'Il manuale non contiene questa informazione.' "
+        "rispondi esattamente: 'Dati insufficienti per verificare.' "
         "Indica tra parentesi quadre il numero dell'estratto usato, ad esempio [1]. "
-        "Il manuale e' del 1907: se rilevante, ricordalo."
+        "Se usi il manuale 'la_vettura_automobile_1907', ricorda che e' del 1907."
     )
     corpo = {
         "model": config.MODELLO_OLLAMA,
@@ -236,7 +269,7 @@ def _chiedi_a_ollama(domanda, brani):
         "options": {"temperature": 0.1},
         "messages": [
             {"role": "system", "content": istruzioni},
-            {"role": "user", "content": f"ESTRATTI DEL MANUALE:\n{estratti}\n\nDOMANDA: {domanda}"},
+            {"role": "user", "content": f"ESTRATTI:\n{estratti}\n\nDOMANDA: {domanda}"},
         ],
     }
     richiesta = urllib.request.Request(

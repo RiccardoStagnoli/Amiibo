@@ -13,6 +13,7 @@ from datetime import datetime
 
 import config
 import extra
+import memoria
 from personalita import SOGLIA_CERTEZZA, errore_utente, incerto, saggio
 
 
@@ -33,8 +34,13 @@ AIUTO = (
     "'agenda', 'aggiungi al calendario: ...', 'cerca su drive ...', 'leggi teams', 'meteo', "
     "'che ore sono', 'meccanica: <domanda>', 'rapporto', 'ricordami tra 20 minuti di ...', "
     "'ricordami alle 18 di ...', 'promemoria', 'annota ...', 'leggi le note', 'accendi msi', "
-    "'non disturbare per 2 ore', 'fine non disturbare', 'riepilogo', e le tue macro (config.py)."
+    "'non disturbare per 2 ore', 'fine non disturbare', 'riepilogo', e le tue macro (config.py). "
+    "Memoria: 'ricorda che ...', 'cosa sai di ...', 'dimentica ...', 'quando dico ... intendi ...', "
+    "'cosa hai imparato'. Le domande (che finiscono con ?) vengono cercate in manuali, documenti e memoria."
 )
+
+
+PAROLE_DOMANDA = r"^(come|cosa|che cos|quale|qual|quali|quanto|quanti|quanta|quante|chi|dove|quando|perche|spiegami|dimmi)\b"
 
 
 class Interprete:
@@ -43,7 +49,7 @@ class Interprete:
         self.s = servizi
 
     # ------------------------------------------------------------------
-    def esegui(self, frase):
+    def esegui(self, frase, _profondita=0):
         originale = (frase or "").strip()
         t = normalizza(originale)
         t = re.sub(r"^(ehi |ok |hey )?jarvis[,:]? ?", "", t)
@@ -53,14 +59,50 @@ class Interprete:
         if not t:
             return risposta(errore_utente("Non hai detto niente."), "errore_utente")
 
+        if _profondita > 5:
+            return risposta("Comandi insegnati che si richiamano in cerchio: controlla la sezione Memoria.", "errore")
+
+        # Comandi che mi hai insegnato ("quando dico X intendi Y")
+        insegnato = memoria.comando_per(t)
+        if insegnato:
+            return self.esegui(insegnato, _profondita + 1)
+
         # Macro personali definite in config.py (es. "modalita gioco")
         macro = {normalizza(k): v for k, v in getattr(config, "MACRO", {}).items()}
         if t in macro:
-            esiti = [self.esegui(c) for c in macro[t]]
+            esiti = [self.esegui(c, _profondita + 1) for c in macro[t]]
             return risposta(" ".join(e["testo"] for e in esiti),
                             "ok" if all(e["esito"] == "ok" for e in esiti) else "errore")
 
-        regole = [
+        for schema, azione in self._regole():
+            m = re.match(schema, orig, re.IGNORECASE) or re.match(schema, t)
+            if m:
+                try:
+                    return azione(m)
+                except Exception as e:  # errore del sistema, NON dell'utente: niente insulti
+                    return risposta(f"Errore del sistema: {e}", "errore")
+
+        # Nessun comando: se e' una domanda, cerco nelle mie fonti (manuali, documenti, memoria).
+        if originale.rstrip().endswith("?") or re.match(PAROLE_DOMANDA, t):
+            testo, brani = self.s["chiedi"](t, solo=self._fonte(t))
+            if brani:
+                return risposta(testo, "ok", fonti=[{"manuale": b["manuale"], "sezione": b["sezione"]} for b in brani])
+            memoria.registra_non_capito(orig)
+            return risposta(testo + " Insegnamelo con 'ricorda che ...' o caricando un documento nella sezione Memoria.", "incerto")
+        memoria.registra_non_capito(orig)
+        return risposta("Comando non riconosciuto. Insegnamelo: 'quando dico ... intendi ...', "
+                        "oppure scrivi 'aiuto'.", "sconosciuto")
+
+    def riconosce(self, frase):
+        """True se la frase corrisponde a un comando conosciuto (senza eseguirlo)."""
+        t = re.sub(r"^(ehi |ok |hey )?jarvis[,:]? ?", "", normalizza(frase))
+        if memoria.comando_per(t) or t in {normalizza(k) for k in getattr(config, "MACRO", {})}:
+            return True
+        return any(re.match(schema, frase.strip(), re.IGNORECASE) or re.match(schema, t)
+                   for schema, _ in self._regole())
+
+    def _regole(self):
+        return [
             (r"^(aiuto|cosa sai fare|comandi)$", lambda m: risposta(AIUTO)),
             (r"^(che ore sono|che ora e|ora)$", self.ora),
             (r"^(meteo|che tempo fa( oggi)?)$", self.meteo),
@@ -103,19 +145,21 @@ class Interprete:
             (r"^(non disturbare|modalita non disturbare)( per (?P<n>\S+) (?P<u>or[ae]|minuti))?$", self.non_disturbare),
             (r"^(fine|basta|disattiva) (non disturbare|modalita non disturbare)$", lambda m: self.s["fine_non_disturbare"]()),
             (r"^(riepilogo|briefing)( (di oggi|giornaliero))?$", lambda m: risposta(self.s["riepilogo"]())),
+            # --- Memoria: cose che mi insegni ---
+            (r"^quando (dico|scrivo) (?P<a>.+?),? (intendi|fai|significa|vuol dire|esegui) (?P<b>.+)$", self.insegna_comando),
+            (r"^(dimentica|cancella) il comando (?P<a>.+)$", self.dimentica_comando),
+            (r"^(ricorda|impara|sappi|memorizza|tieni a mente)( che)?[:,]? (?P<f>(?!di ).+)$", self.impara),
+            (r"^ricorda(mi)? di (?P<t>.+)$", lambda m: (extra.aggiungi_nota(m["t"].strip()), risposta(
+                f"Annotato: {m['t'].strip()}. Per un promemoria a tempo: 'ricordami tra 20 minuti di ...'."))[1]),
+            (r"^(dimentica|cancella dalla memoria)( che)? (?P<f>.+)$", self.dimentica),
+            (r"^cosa (hai imparato|ricordi|sai di me)$", self.cosa_hai_imparato),
+            (r"^(cosa sai|cosa ricordi|dimmi cosa sai)( (di|su|del|della|dello|dei|delle|sul|sulla|sugli|sulle|riguardo a?))? (?P<q>.+)$", lambda m: self.chiedi(m["q"])),
+            (r"^(domanda|chiedi|cerca nei documenti)[:,]? (?P<q>.+)$", lambda m: self.chiedi(m["q"])),
             # --- Meccanica ---
             (r"^meccanica[:,]? ?(?P<q>.*)$", self.meccanica),
             # --- apri programma (va per ultimo tra le regole "apri") ---
             (r"^(apri|avvia) (?P<a>.+?)( su (msi|pc))?$", lambda m: self.msi_app(m["a"])),
         ]
-        for schema, azione in regole:
-            m = re.match(schema, orig, re.IGNORECASE) or re.match(schema, t)
-            if m:
-                try:
-                    return azione(m)
-                except Exception as e:  # errore del sistema, NON dell'utente: niente insulti
-                    return risposta(f"Errore del sistema: {e}", "errore")
-        return risposta("Comando non riconosciuto. Scrivi 'aiuto' per l'elenco.", "sconosciuto")
 
     # ------------------------------ generali ------------------------------
     def ora(self, _m):
@@ -282,3 +326,57 @@ class Interprete:
                 return risposta(errore_utente("Durata non valida. Es. 'non disturbare per 2 ore'."), "errore_utente")
             ore = n if m["u"].startswith("or") else n / 60
         return self.s["non_disturbare"](ore)
+
+    # ------------------------------ Memoria ------------------------------
+    def impara(self, m):
+        fatto = m["f"].strip()
+        if len(fatto.split()) < 2:
+            return risposta(errore_utente("Ricordare cosa? Scrivi un fatto intero, es. 'ricorda che la mia moto è una Honda'."), "errore_utente")
+        f = memoria.aggiungi_fatto(fatto[0].upper() + fatto[1:])
+        if f is None:
+            return risposta("Lo sapevo già.")
+        self.s["ricarica"]()
+        return risposta(f"Memorizzato: {f['testo']}")
+
+    def dimentica(self, m):
+        n = memoria.dimentica(m["f"])
+        if not n:
+            return risposta(errore_utente(f"Non ho nessun fatto che contenga '{m['f'].strip()}'."), "errore_utente")
+        self.s["ricarica"]()
+        return risposta(f"Dimenticati {n} fatti.")
+
+    def insegna_comando(self, m):
+        frase, comando = m["a"].strip(" '\""), m["b"].strip(" '\"")
+        if not frase or not comando:
+            return risposta(errore_utente("Formato: 'quando dico <frase> intendi <comando>'."), "errore_utente")
+        if normalizza(frase) == normalizza(comando):
+            return risposta(errore_utente("Frase e comando sono uguali. Geniale."), "errore_utente")
+        if not self.riconosce(comando):
+            return risposta(errore_utente(f"Il comando '{comando}' non lo conosco. Insegnami solo comandi che esistono (scrivi 'aiuto')."), "errore_utente")
+        memoria.aggiungi_alias(frase, comando)
+        return risposta(f"Imparato: quando dici '{frase}' eseguo '{comando}'.")
+
+    def dimentica_comando(self, m):
+        n = memoria.elimina_alias(m["a"].strip(" '\""))
+        if not n:
+            return risposta(errore_utente(f"Non conosco nessun comando '{m['a'].strip()}'."), "errore_utente")
+        return risposta("Comando dimenticato.")
+
+    def cosa_hai_imparato(self, _m):
+        f, a, d = memoria.fatti(), memoria.alias(), memoria.documenti()
+        testo = f"Ho imparato {len(f)} fatti, {len(a)} comandi e {len(d)} documenti."
+        if f:
+            testo += " Ultimi fatti: " + " ".join(x["testo"].rstrip(".") + "." for x in f[-5:])
+        return risposta(testo)
+
+    @staticmethod
+    def _fonte(t):
+        """Domande personali ('la mia moto', 'il mio prof') solo dalla memoria, mai dai manuali."""
+        return "memoria" if re.search(r"\b(mio|mia|miei|mie|me|io|mi|ho|sono)\b", t) else None
+
+    def chiedi(self, domanda):
+        if not domanda.strip():
+            return risposta(errore_utente("Quale domanda?"), "errore_utente")
+        testo, brani = self.s["chiedi"](domanda, solo=self._fonte(normalizza(domanda)))
+        return risposta(testo, "ok" if brani else "incerto",
+                        fonti=[{"manuale": b["manuale"], "sezione": b["sezione"]} for b in brani])
