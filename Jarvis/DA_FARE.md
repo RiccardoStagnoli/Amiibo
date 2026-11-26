@@ -1,167 +1,180 @@
-# JARVIS – Cose da fare a mano (in ordine)
+# JARVIS – Tutto quello che devi fare, in ordine
 
-Qui c'è tutto quello che non ho potuto fare io, dall'inizio della conversazione.
-I dettagli di ogni passo sono in `GUIDA.md`, nella Fase indicata tra parentesi.
-Spunta ogni riga quando l'hai fatta.
+Segui le parti nell'ordine. Ogni punto rimanda alla **Fase** di `GUIDA.md`, dove trovi i dettagli.
+Le parti segnate *(facoltativa)* si possono saltare: Jarvis funziona lo stesso, senza quella funzione.
 
-## A. Una volta sola, sul PC SERVER
+---
 
-- [ ] **1. Python** (Fase 1)
-  - Scarica Python 3 da python.org e installalo spuntando "Add python.exe to PATH".
-  - Verifica: `py --version` nel Prompt dei comandi.
-- [ ] **2. Cartella Jarvis** (Fase 2)
-  - Estrai `Jarvis.zip` e metti la cartella in `C:\Jarvis`.
-- [ ] **3. Google Cloud** (Fase 3)
-  - Crea il progetto `Jarvis`.
-  - Abilita **Gmail API**, **Google Calendar API** e **Google Drive API**.
-  - Configura la schermata di consenso: tipo "Esterno", tu come **utente di test**.
-  - Crea un client di tipo **App desktop** e scarica il JSON.
-  - Rinominalo `credentials.json` e mettilo in `C:\Jarvis`.
-- [ ] **4. Librerie Python** (Fase 4)
-  - Doppio clic su `C:\Jarvis\installa.bat`.
-- [ ] **5. Primo accesso a Google** (Fase 5)
-  - Doppio clic su `avvia_jarvis.bat`, poi tasto `1`.
-  - Nel browser accetta **tutti** i permessi.
-  - In modalità Test va ripetuto ogni 7 giorni: Jarvis riapre il browser da solo.
-- [ ] **6. Node.js e WhatsApp** (Fase 7)
-  - Installa Node.js LTS da nodejs.org.
-  - Doppio clic su `installa_whatsapp.bat`.
-- [ ] **7. Personalizza `config.py`** (aprilo con il Blocco note)
-  - `NOME_UTENTE`
-  - `CITTA_METEO`
-  - `MITTENTI_PROTETTI`: domini da non toccare mai, es. `"scuola.it"`.
-  - `INSULTI_ATTIVI`
-  - `SOGLIA_CERTEZZA`: lascia 0.90.
-- [ ] **8. Avvio** (Fase 8)
-  - Doppio clic su `avvia_server_jarvis.bat`.
-  - Apri http://localhost:8080 → Impostazioni → inquadra il **QR** con WhatsApp sul telefono (Dispositivi collegati).
-- [ ] **9. Microfono e voce** (Fasi 8 e 15)
-  - Collega il microfono al server.
-  - Impostazioni Windows → Privacy → Microfono: consenti alle app desktop.
-  - Impostazioni Windows → Ora e lingua → Voce: aggiungi le voci **Italiano**.
-  - Nel pannello → Impostazioni → Voce: scegli una voce non "Natural" e regola il tono.
-- [ ] **10. Server sempre acceso** (Fase 9)
-  - Sospensione **Mai**.
-  - Collegamento di `avvia_server_jarvis.bat` in `shell:startup`.
-  - IP fisso del server nel router.
-- [ ] **11. Ollama** (Fase 6, facoltativo)
-  - Installa Ollama, poi esegui `ollama pull gemma2:2b`.
-  - Serve per risposte di meccanica scritte in modo discorsivo.
+## PARTE 0 – Cosa ti serve
 
-## B. Teams (Fase 12)
+- [ ] Un **PC server** con Windows 10/11 sempre acceso, con **microfono** e **casse** (per "Jarvis attivazione"). Meglio collegato al router **via cavo**.
+- [ ] Il tuo **PC Msi** *(facoltativo, per il controllo a distanza)*.
+- [ ] Gli account che vuoi collegare:
+  - **obbligatorio:** Google (Gmail);
+  - **facoltativi:** WhatsApp, account Microsoft della scuola (Teams), ClasseViva, Amazon (Alexa), Spotify, Discord, GitHub.
 
-- [ ] **12.** Registra l'app `Jarvis` su entra.microsoft.com:
-  - tipo di account: multi-tenant;
-  - "Consenti flussi client pubblici" = **Sì**.
-- [ ] **13.** In `config.py`:
-  - copia l'ID applicazione in `TEAMS_CLIENT_ID`;
-  - scrivi i cognomi dei prof in `TEAMS_PROFESSORI`.
-- [ ] **14.** Doppio clic su `accedi_teams.bat`, poi inserisci il codice su microsoft.com/devicelogin con l'**account della scuola**.
-- [ ] **15.** Se compare "Approvazione dell'amministratore necessaria": la scuola blocca l'accesso. Usa l'alternativa: notifiche email di Teams inoltrate al tuo Gmail.
+## PARTE 1 – Installare i programmi sul PC server
 
-## C. PC Msi (Fase 13)
+1. [ ] **Python 3** da python.org. Durante l'installazione spunta **"Add python.exe to PATH"**.
+   Controllo: nel Prompt dei comandi `py --version` (Fase 1).
+2. [ ] **Node.js LTS** da nodejs.org, con le opzioni predefinite (Fase 7).
+3. [ ] **Scarica Jarvis**: GitHub `riccardostagnoli/amiibo` → ramo `claude/jarvis-gmail-reader-k8f67k` → Code → Download ZIP (oppure il `Jarvis.zip` della chat). Estrai e copia la cartella in **`C:\Jarvis`** (Fase 2).
+4. [ ] Doppio clic su **`C:\Jarvis\installa.bat`** (Fase 4).
+   - Se dà errore su "piper" o "onnxruntime", installa il **Microsoft Visual C++ Redistributable x64** dal sito Microsoft e rilancialo.
+5. [ ] Doppio clic su **`C:\Jarvis\installa_whatsapp.bat`**. Installa WhatsApp e Alexa e richiede alcuni minuti.
 
-- [ ] **16.** Sul server, in `config.py`:
-  - `TOKEN_AGENTE_MSI`: un token lungo e casuale;
-  - `HOST_PANNELLO = "0.0.0.0"`;
-  - `PASSWORD_PANNELLO`: almeno 12 caratteri.
-  - Poi riavvia il server.
-- [ ] **17.** Sul Msi: installa Python e copia la cartella `msi` in `C:\JarvisMsi`.
-- [ ] **18.** In `msi_agente.py` imposta `SERVER` (IP del server) e `TOKEN` (lo stesso del server).
-- [ ] **19.** Doppio clic su `installa_msi.bat`, poi su `avvia_msi.bat`. Poi metti il collegamento ad `avvia_msi.bat` in `shell:startup`.
+## PARTE 2 – Account Google (Fase 3 e 5)
 
-## D. Accesso da ovunque e Rabbit R1 (Fase 14)
+6. [ ] Su console.cloud.google.com:
+   - crea il progetto **Jarvis**;
+   - abilita **Gmail API**, **Google Calendar API** e **Google Drive API**.
+7. [ ] Configura la schermata di consenso:
+   - tipo **Esterno**;
+   - in **Pubblico → Utenti di test** aggiungi il tuo indirizzo Gmail.
+8. [ ] In **Client → Crea client** scegli **App desktop**, poi **Scarica JSON**.
+   - Rinomina il file in **`credentials.json`** e mettilo in `C:\Jarvis`.
+   - Attento che non diventi `credentials.json.json`.
+9. [ ] Fai il primo accesso:
+   - doppio clic su `avvia_jarvis.bat` e premi `1`;
+   - nel browser accetta **tutti** i permessi (all'avviso "app non verificata" scegli Continua).
+   - Si ripete ogni 7 giorni finché l'app resta in modalità Test.
 
-- [ ] **20.** Installa Tailscale su server e telefono, con lo stesso account.
-- [ ] **21.** In `config.py` imposta `ACCESSO_REMOTO = True` (la password è obbligatoria).
-- [ ] **22.** Dal telefono apri `http://100.x.y.z:8080`, poi "Aggiungi a schermata Home".
-- [ ] **23.** Rabbit R1:
-  - sul server esegui `tailscale funnel --bg 8080`;
-  - sul R1 apri l'indirizzo `https://...ts.net/?modo=r1`.
-  - Procedura sul R1: **non verificata** (vedi Fase 14).
+## PARTE 3 – Impostazioni base in `C:\Jarvis\config.py` (si apre con il Blocco note)
 
-## E. Funzioni extra (Fase 16, facoltative)
+10. [ ] `NOME_UTENTE`, `CITTA_METEO`, `ORA_RIEPILOGO` (es. `"07:00"`).
+11. [ ] `MITTENTI_PROTETTI` (es. `["scuola.edu.it"]`): queste email non verranno mai pulite.
+12. [ ] `COMPITI_MITTENTI`: domini o indirizzi Gmail dei professori.
+13. [ ] Personalizza le `MACRO` (es. "modalita gioco").
+14. [ ] Lascia `INSULTI_ATTIVI = True` e `SOGLIA_CERTEZZA = 0.90`, oppure cambiali.
 
-- [ ] **24.** In `config.py` scegli `ORA_RIEPILOGO` (es. `"07:00"`) e personalizza le `MACRO`.
-- [ ] **25.** Accensione del Msi dalla rete:
-  - collega il Msi al router via cavo;
-  - copia il suo MAC in `MAC_MSI`;
-  - attiva Wake-on-LAN in Windows e nel BIOS.
-- [ ] **26.** Ogni tanto controlla il **Registro attività** (Impostazioni) per verificare gli accessi.
+## PARTE 4 – Primo avvio del server
 
-## E2. Insegnare a Jarvis (Fase 17)
+15. [ ] Doppio clic su **`C:\Jarvis\avvia_server_jarvis.bat`**. Si aprono 4 finestre ridotte a icona: **WhatsApp, Pannello, Ascolto, Alexa**. Non chiuderle.
+    - Al primo avvio vengono scaricati il modello vocale (50 MB) e la voce di Jarvis (28 MB).
+16. [ ] Apri **http://localhost:8080** → **Impostazioni** → inquadra il **QR** con WhatsApp sul telefono (Dispositivi collegati → Collega un dispositivo) (Fase 8).
+17. [ ] Impostazioni → Voce → **Prova voce**. Se non senti niente, controlla le casse e il motore "Voce di Jarvis".
+18. [ ] Windows → Privacy e sicurezza → **Microfono**: consenti l'accesso alle app desktop.
+19. [ ] Prova l'attivazione: di' **"Jarvis attivazione"**, aspetta il **"Sì?"**, poi "che ore sono" (Fase 31).
+    - Se capisce male, metti `MODELLO_VOSK = "vosk-model-it-0.22"` (1,3 GB) e riavvia.
+20. [ ] Facoltativo: aggiungi le voci italiane di Windows (Impostazioni → Ora e lingua → Voce).
 
-- [ ] **26b.** Sezione **Memoria** del pannello:
-  - insegna i primi fatti (moto, auto, prof, orari);
-  - carica il libretto della tua moto o auto in PDF.
-- [ ] **26c.** Ogni settimana controlla *"Comandi e domande che non ho capito"* e premi **Insegna**.
-- [ ] **26d.** Fai ogni tanto una copia della cartella `C:\Jarvis\dati`.
+## PARTE 5 – Server sempre acceso (Fase 9)
 
-## E3. Voce, foto/video e app sul telefono (Fasi 18–20)
+21. [ ] Impostazioni → Sistema → Alimentazione: sospensione **Mai**.
+22. [ ] `Win + R` → `shell:startup` → crea un collegamento a `avvia_server_jarvis.bat`.
+23. [ ] Nel router assegna al server un **IP fisso**. Annota l'IP (`ipconfig` → Indirizzo IPv4).
 
-- [ ] **26e.** Esegui di nuovo `installa.bat`: aggiunge la voce Piper e il generatore di QR.
-  - Al primo avvio il server scarica la voce (28 MB).
-  - Se Piper dà errore all'avvio, installa il "Microsoft Visual C++ Redistributable" (x64) dal sito Microsoft. *Dati insufficienti per verificare se serve su ogni PC.*
-- [ ] **26f.** In `config.py` scegli `VOCE_PIPER` ed `EFFETTO_VOCE`, poi prova la voce in Impostazioni → Voce → "Prova voce".
-- [ ] **26g.** Telefono:
-  - esegui `tailscale serve --bg 8080`;
-  - in `config.py` imposta `ACCESSO_REMOTO = True`, la password e `INDIRIZZO_TELEFONO`;
-  - inquadra il QR in Impostazioni → "App per telefono" e installa l'app.
+## PARTE 6 – Sicurezza (prima di aprire Jarvis ad altri dispositivi)
 
-## E4. Chrome sul Msi (Fase 21)
+24. [ ] In `config.py` metti una `PASSWORD_PANNELLO` di almeno 12 caratteri.
+25. [ ] Metti `HOST_PANNELLO = "0.0.0.0"` (serve per telefono e Msi in casa) e riavvia il server.
+26. [ ] Ogni tanto controlla **Impostazioni → Registro attività**: accessi e password sbagliate.
 
-- [ ] **26h.** Sul Msi:
-  - aggiorna la cartella `C:\JarvisMsi` con la nuova cartella `msi`, tenendo `SERVER` e `TOKEN` in `msi_agente.py`;
-  - esegui `installa_msi.bat`, poi `avvia_msi.bat`.
-- [ ] **26i.** Di' o scrivi `apri chrome`, poi nella nuova finestra accedi a Google e attiva la sincronizzazione.
+## PARTE 7 – Telefono e fuori casa (Fasi 14, 20)
 
-## E5. GitHub (Fase 22)
+27. [ ] Crea un account **Tailscale** e installalo sul **server** e sul **telefono**, con lo stesso account.
+28. [ ] Sul server, nel Prompt dei comandi: `tailscale serve --bg 8080`. Se compare un link per abilitare HTTPS, aprilo e conferma.
+29. [ ] In `config.py`:
+    - `ACCESSO_REMOTO = True`;
+    - `INDIRIZZO_TELEFONO = "https://<nome-pc>.<tuo-nome>.ts.net"`;
+    - poi riavvia il server.
+30. [ ] Pannello → Impostazioni → **App per telefono** → inquadra il QR con il telefono → installa l'app:
+    - Android: menu ⋮ → Installa app;
+    - iPhone: Condividi → Aggiungi alla schermata Home.
+31. [ ] Sull'app del telefono: Impostazioni → Voce → **Ascolto sempre attivo**, poi consenti il microfono.
+32. [ ] *(facoltativa)* Rabbit R1:
+    - sul server esegui `tailscale funnel --bg 8080`;
+    - sul R1 apri `https://...ts.net/?modo=r1`. La procedura sul R1 non è verificata.
 
-- [ ] **26l.** Crea un token su GitHub (Fine-grained, permessi indicati nella guida).
-- [ ] **26m.** Incollalo nel pannello: sezione GitHub → Collega.
+## PARTE 8 – Scuola: Teams e ClasseViva (Fasi 12, 25, 26)
 
-## E6. Esercizi e scrittura a mano (Fasi 23–24)
+33. [ ] Su entra.microsoft.com (con un account Microsoft personale) → Registrazioni app → **Nuova**:
+    - nome `Jarvis`, multi-tenant;
+    - in **Autenticazione** metti **Consenti flussi client pubblici = Sì**;
+    - copia l'ID applicazione in `TEAMS_CLIENT_ID`.
+34. [ ] In `config.py`:
+    - `TEAMS_PROFESSORI` (cognomi dei prof);
+    - facoltativo: `TEAMS_POSTA_SCUOLA = True` e `TEAMS_LEGGI_COMPITI = True`.
+35. [ ] Doppio clic su **`accedi_teams.bat`**, poi inserisci il codice su microsoft.com/devicelogin con l'**account della scuola**.
+    - Se compare "approvazione dell'amministratore necessaria", rimetti `False` le opzioni del punto 34. Se continua, la scuola blocca l'accesso: usa le notifiche email di Teams inoltrate a Gmail.
+36. [ ] Pannello → **Compiti** → inserisci le credenziali **ClasseViva** → Collega.
+37. [ ] Prova: `controlla i compiti` → `mostra esercizio 1`. L'invio avviene solo con **`manda esercizio 1`**.
 
-- [ ] **26n.** Esegui di nuovo `installa.bat`: aggiunge SymPy, NumPy e Pillow.
-- [ ] **26o.** Sezione **Scrittura** → **Allenamento**: scrivi ogni lettera 3–5 volte (circa 10 minuti).
-- [ ] **26p.** Quando Jarvis evidenzia una parola in arancione, correggila e premi **Conferma e impara**.
+## PARTE 9 – PC Msi *(facoltativa)* (Fasi 13, 16, 21)
 
-## E7. ClasseViva, Spotify, Discord, Alexa (Fasi 26–29)
+38. [ ] Inventa un token lungo e casuale e scrivilo in `config.py` → `TOKEN_AGENTE_MSI`, poi riavvia il server.
+39. [ ] Sul Msi:
+    - installa Python;
+    - copia la cartella `C:\Jarvis\msi` in `C:\JarvisMsi`;
+    - in `msi_agente.py` imposta `SERVER = "http://IP-DEL-SERVER:8080"` e `TOKEN` (uguale al server).
+40. [ ] Sul Msi: `installa_msi.bat`, poi `avvia_msi.bat`, poi collegamento di `avvia_msi.bat` in `shell:startup`.
+41. [ ] Di' o scrivi `apri chrome`. Nella finestra "Chrome di Jarvis" accedi a Google e attiva la **sincronizzazione**.
+42. [ ] *(facoltativa)* Accensione a distanza:
+    - collega il Msi al router via cavo;
+    - `ipconfig /all` → copia l'Indirizzo fisico in `MAC_MSI`;
+    - attiva "Wake on Magic Packet" in Gestione dispositivi e la riattivazione da rete nel BIOS.
 
-- [ ] **26q.** Sezione Compiti → collega **ClasseViva**.
-- [ ] **26r.** Esegui di nuovo `installa_whatsapp.bat`, poi riavvia `avvia_server_jarvis.bat` (4 finestre).
-- [ ] **26s.** Dal PC server apri http://127.0.0.1:3456 e accedi ad **Amazon** (Alexa).
-- [ ] **26t.** **Spotify**:
-  - crea l'app sul Developer Dashboard (Redirect `http://127.0.0.1:8080/spotify/callback`);
-  - metti il Client ID in `config.py`;
-  - dal PC server apri http://127.0.0.1:8080/spotify/accedi.
-- [ ] **26u.** **Discord**:
-  - crea il bot e attiva il Message Content Intent;
-  - aggiungi il bot al tuo server;
-  - in `config.py` metti il token e gli ID dei canali.
+## PARTE 10 – Casa, musica e altri servizi *(facoltative)* (Fasi 22, 27, 28, 29)
 
-## E8. Per te (Fase 30)
+43. [ ] **Alexa:** dal PC server apri **http://127.0.0.1:3456** e accedi ad Amazon. Prova: `accendi la luce del salotto`.
+44. [ ] **Spotify:**
+    - developer.spotify.com → Create app;
+    - Redirect URI **`http://127.0.0.1:8080/spotify/callback`**, API "Web API";
+    - Client ID in `SPOTIFY_CLIENT_ID`, poi riavvia;
+    - dal PC server apri **http://127.0.0.1:8080/spotify/accedi**.
+    - Il comando della riproduzione richiede Premium.
+45. [ ] **Discord:**
+    - discord.com/developers → New Application → Bot → copia il token in `DISCORD_BOT_TOKEN`;
+    - attiva **Message Content Intent**;
+    - OAuth2 → URL Generator (`bot`, View Channels, Send Messages, Read Message History) → aggiungi il bot al tuo server;
+    - in `DISCORD_CANALI` metti gli ID dei canali (Modalità sviluppatore → tasto destro sul canale → Copia ID).
+46. [ ] **GitHub:**
+    - github.com → Settings → Developer settings → Fine-grained token;
+    - permessi: Contents, Issues, Pull requests in lettura/scrittura; Actions e Metadata in sola lettura;
+    - pannello → **GitHub** → incolla il token → Collega.
 
-- [ ] **26v.** Sezione **Per te**: scrivi 5–10 cose che ti piacciono e gli oggetti da tenere d'occhio.
-- [ ] **26w.** Per le guide passo passo installa Ollama ed esegui `ollama pull qwen2.5:7b`, poi imposta `MODELLO_GUIDE = "qwen2.5:7b"`. Se il PC è lento, lascia vuoto (usa gemma2:2b).
-- [ ] **26x.** Se avevi già collegato Spotify, rifai l'accesso da http://127.0.0.1:8080/spotify/accedi (nuovo permesso per gli artisti preferiti).
+## PARTE 11 – Intelligenza artificiale locale *(facoltativa, consigliata)* (Fasi 6, 30)
 
-## E9. "Jarvis attivazione" come Alexa (Fase 31)
+47. [ ] Installa **Ollama** da ollama.com, poi nel Prompt dei comandi:
+    - `ollama pull gemma2:2b`, per le risposte di meccanica e documenti;
+    - `ollama pull qwen2.5:7b` (circa 5 GB), per le **guide passo passo**.
+48. [ ] In `config.py` metti `MODELLO_GUIDE = "qwen2.5:7b"`. Se il PC è troppo lento, lascialo vuoto.
 
-- [ ] **26y.** Collega un microfono e delle casse al PC server, poi riavvia `avvia_server_jarvis.bat`.
-- [ ] **26z.** Di' "Jarvis attivazione", aspetta il "Sì?" e di' "che ore sono".
-- [ ] **26aa.** Sul telefono (app Jarvis): Impostazioni → Voce → "Ascolto sempre attivo".
+## PARTE 12 – Insegnare a Jarvis (primi giorni)
 
-## F. Telefono Vodafone (non automatizzabile gratis)
+49. [ ] **Per te:**
+    - scrivi 5–10 cose che ti piacciono (o di' "mi piace ...");
+    - scrivi gli oggetti da tenere d'occhio.
+50. [ ] **Memoria:**
+    - insegna fatti su di te ("ricorda che la mia moto è...");
+    - carica i libretti di moto o auto e gli appunti in PDF.
+51. [ ] **Scrittura → Allenamento:** scrivi ogni lettera 3–5 volte, staccata (circa 10 minuti).
+52. [ ] Ogni settimana:
+    - Memoria → "Comandi e domande che non ho capito" → **Insegna**;
+    - Scrittura → correggi le parole arancioni → **Conferma e impara**.
+53. [ ] Ogni tanto copia la cartella **`C:\Jarvis\dati`** su una chiavetta o su Drive. Contiene tutto quello che Jarvis sa.
 
-- [ ] **27.** Facoltativo: chiama il **42020** e registra il saluto della segreteria: *"Riccardo non è al momento raggiungibile..."*.
-  - Jarvis **non** può leggere questi messaggi: non ho trovato un invio via email da parte di Vodafone.
-- [ ] **28.** Se vuoi esattamente quello che hai chiesto (risposta, registrazione, tasto 1, lettura in Jarvis), serve **Twilio**, a pagamento: chiedilo e lo costruisco.
+## PARTE 13 – Controllo finale (se tutti funzionano, Jarvis è a posto)
 
-## Cosa NON è stato provato da me (da controllare al primo avvio)
+- [ ] "Jarvis attivazione" → "che ore sono" → risposta a voce dalle casse.
+- [ ] `leggi la posta` → elenco delle email non lette.
+- [ ] `agenda` → impegni di Google Calendar e ClasseViva.
+- [ ] `controlla i compiti` → bozze nella sezione Compiti.
+- [ ] Scrivi a te stesso su WhatsApp da un altro numero → compare nel pannello.
+- [ ] `risolvi x^2-5x+6=0` → x = 2; x = 3.
+- [ ] `novità per me` → notizie sui tuoi interessi.
+- [ ] Dal telefono (app Jarvis) → "Jarvis attivazione" → "meteo".
+- [ ] *(se configurati)* `apri chrome e cerca youtube` (Msi), `accendi la luce` (Alexa), `metti ... su spotify`, `messaggi discord`, `github`.
 
-- Collegamento reale a WhatsApp, Google, Teams e PC Msi: li ho provati con servizi **simulati**.
-- Funzionamento su Windows: l'ho provato su Linux. I file `.bat` non li ho eseguiti.
-- Voce reale del browser e microfono: il riconoscimento della frase "Jarvis attivazione" l'ho provato con audio sintetico.
-- Meteo: il servizio Open-Meteo era bloccato dal limite di richieste del mio ambiente. Il formato dei dati è quello documentato.
-- La voce originale di Yoda non è disponibile: c'è solo lo stile "saggio maestro" (frasi invertite e tono basso).
+Se qualcosa non va: `GUIDA.md` → **Problemi frequenti**, e le 4 finestre di Jarvis (gli errori sono scritti lì).
+
+---
+
+### Cose che non si possono fare gratis (già spiegate)
+- **Chiamate al cellulare Vodafone:** puoi registrare il saluto della segreteria al 42020, ma Jarvis non può leggere quei messaggi. La versione automatica richiede **Twilio**, a pagamento.
+- **Prezzi dei negozi:** Jarvis prepara i link di ricerca, ma non legge i prezzi.
+- **Voce originale del Jarvis dei film:** non usata, perché sarebbe la copia della voce di un attore reale.
+
+### Mai provato con i tuoi account veri (controllalo tu ai punti sopra)
+WhatsApp, Google, Teams, ClasseViva, Alexa, Spotify, Discord, GitHub, PC Msi, microfono e casse reali, Windows.
+Tutto è stato provato con servizi simulati e su Linux.
